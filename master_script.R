@@ -17,6 +17,7 @@ odds_repo = updateOddsFromAPI(odds_repo, sport = "soccer_uefa_european_champions
 odds_table = extract_over_row(odds_repo@data)
 
 
+
 library(data.table)
 
 
