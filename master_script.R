@@ -2,6 +2,7 @@
 
 source("repo_class.R")
 source("DataHandlers.R")
+source("Calculations.R")
 
 sports_repo = new("Sports_Repository")
 sports_repo = updateSportsFromAPI(sports_repo, all = "false")
