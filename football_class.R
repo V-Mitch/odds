@@ -26,6 +26,7 @@ library(data.table)
   teams_repo = new("Teams_Repository")
   teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
   
+  as.data.table(parsed_data$teams[[1]]$coach)
   
   
 # S4 class containing list of slots.
@@ -36,6 +37,19 @@ setClass("Teams_Repository", slots=list(competition = "EC"))
     res <- GET(url,  add_headers(`X-Auth-Token` = "82651a7780a24613af6601960b77fcfd"))
     return(res)
   }
+  
+  formatTeamTable <- function(parsed_data) {
+    
+    coach_table <- as.data.table(parsed_data$teams[[1]]$coach)
+    coach_table[["contract_start"]] <- coach_table[["contract"]][[1]]
+    coach_table[["contract_end"]] <- coach_table[["contract"]][[2]]
+    coach_table <- coach_table[-2]
+    coach_table[["position"]] <- "coach"
+    coach_table[, c("firstName", "lastName", "contract") := NULL]
+    teams_table <- rbindlist(lapply(parsed_data$teams[[1]]$squad, as.data.table))
+    
+  }
+  
   
   # Define a method to add data to the repository
   setGeneric(name = "updateTeamsFromAPI",
@@ -48,7 +62,7 @@ setClass("Teams_Repository", slots=list(competition = "EC"))
             definition = function(object, competition) {
               newData <- getLatestTeamsFromAPI(competition)
               str_res_json <- rawToChar(newData$content)
-              parsed_events <- fromJSON(str_res_json)
+              parsed_data <- fromJSON(str_res_json)
               data_table <- rbindlist(lapply(parsed_data$teams[[1]]$squad, as.data.table))
               #object$data <- data_table
               #object$time <- Sys.time()
