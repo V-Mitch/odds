@@ -3,7 +3,7 @@ library(httr)
 library(rjson)
 library(data.table)
   
-  url <- paste("http://api.football-data.org/v4/matches/?date=2024-06-14")
+  url <- paste("http://api.football-data.org/v4/matches/?dateFrom=2023-06-14&dateTo=2024-06-14")
   res <- GET(url,  add_headers(`X-Auth-Token` = "82651a7780a24613af6601960b77fcfd"))
   str_res_json <- rawToChar(res$content)
   parsed_data <- fromJSON(str_res_json)
@@ -26,7 +26,6 @@ library(data.table)
   teams_repo = new("Teams_Repository")
   teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
   
-  as.data.table(parsed_data$teams[[1]]$coach)
   
   
 # S4 class containing list of slots.
@@ -39,15 +38,21 @@ setClass("Teams_Repository", slots=list(competition = "EC"))
   }
   
   formatTeamTable <- function(parsed_data) {
-    
-    coach_table <- as.data.table(parsed_data$teams[[1]]$coach)
-    coach_table[["contract_start"]] <- coach_table[["contract"]][[1]]
-    coach_table[["contract_end"]] <- coach_table[["contract"]][[2]]
-    coach_table <- coach_table[-2]
-    coach_table[["position"]] <- "coach"
-    coach_table[, c("firstName", "lastName", "contract") := NULL]
-    teams_table <- rbindlist(lapply(parsed_data$teams[[1]]$squad, as.data.table))
-    
+    total_table <- data.table()
+    for (i in 1:parsed_data$count){
+      coach_table <- as.data.table(parsed_data$teams[[i]]$coach)
+      coach_table[["contract_start"]] <- coach_table[["contract"]][[1]]
+      coach_table[["contract_end"]] <- coach_table[["contract"]][[2]]
+      coach_table <- coach_table[-2]
+      coach_table[["position"]] <- "coach"
+      coach_table[, c("firstName", "lastName", "contract") := NULL]
+      squad_table <- rbindlist(lapply(parsed_data$teams[[i]]$squad, as.data.table))
+      team_table <- rbind(squad_table, coach_table, fill = TRUE)
+      team_table[["team"]] <- parsed_data$teams[[i]]$area$name
+      team_table[["team_id"]] <- parsed_data$teams[[i]]$area$id
+      total_table <- rbind(team_table, total_table, fill = TRUE)
+    }
+    return(total_table)
   }
   
   
@@ -63,9 +68,6 @@ setClass("Teams_Repository", slots=list(competition = "EC"))
               newData <- getLatestTeamsFromAPI(competition)
               str_res_json <- rawToChar(newData$content)
               parsed_data <- fromJSON(str_res_json)
-              data_table <- rbindlist(lapply(parsed_data$teams[[1]]$squad, as.data.table))
-              #object$data <- data_table
-              #object$time <- Sys.time()
-              #object@all <- all
+              data_table <- formatTeamTable(parsed_data)
               return(data_table)
             })
