@@ -5,46 +5,47 @@ library(data.table)
 library(purrr)
 library(dplyr)
 library(tidyr)
+library(caret)
 source("stack_player_data.R")
 
-queryString <- list(
-  league = "39",
-  season = "2020",
-  team = "33"
-)
-
-url <- "https://api-football-v1.p.rapidapi.com/v3/teams/statistics"
-res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
-                             'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'),
-           query = queryString)
-str_res_json <- rawToChar(res$content)
-parsed_data <- fromJSON(str_res_json)
-parsed_data
-
-
-# rbindlist(lapply(parsed_data$response, as.data.table))
-# MISCELLANEOUS
-url <- "https://api-football-v1.p.rapidapi.com/v3/teams/?league=4&season=2024"
-res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
-                             'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
-str_res_json <- rawToChar(res$content)
-euro_cup_teams <- fromJSON(str_res_json)
-euro_cup_teams
-
-
-
-url <- "https://api-football-v1.p.rapidapi.com/v3/leagues"
-res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
-                             'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
-str_res_json <- rawToChar(res$content)
-leagues_data <- fromJSON(str_res_json)
-leagues_data
-
-url <- paste("https://api-football-v1.p.rapidapi.com/v3/players/?league=10&season=2024&page=",1,sep = "")
-res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
-                             'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
-str_res_json <- rawToChar(res$content)
-parsed_friendlies <- fromJSON(str_res_json)
+# queryString <- list(
+#   league = "39",
+#   season = "2020",
+#   team = "33"
+# )
+# 
+# url <- "https://api-football-v1.p.rapidapi.com/v3/teams/statistics"
+# res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
+#                              'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'),
+#            query = queryString)
+# str_res_json <- rawToChar(res$content)
+# parsed_data <- fromJSON(str_res_json)
+# parsed_data
+# 
+# 
+# # rbindlist(lapply(parsed_data$response, as.data.table))
+# # MISCELLANEOUS
+# url <- "https://api-football-v1.p.rapidapi.com/v3/teams/?league=4&season=2024"
+# res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
+#                              'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
+# str_res_json <- rawToChar(res$content)
+# euro_cup_teams <- fromJSON(str_res_json)
+# euro_cup_teams
+# 
+# 
+# 
+# url <- "https://api-football-v1.p.rapidapi.com/v3/leagues"
+# res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
+#                              'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
+# str_res_json <- rawToChar(res$content)
+# leagues_data <- fromJSON(str_res_json)
+# leagues_data
+# 
+# url <- paste("https://api-football-v1.p.rapidapi.com/v3/players/?league=10&season=2024&page=",1,sep = "")
+# res <- GET(url,  add_headers('x-rapidapi-key' = "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6",
+#                              'x-rapidapi-host' = 'api-football-v1.p.rapidapi.com'))
+# str_res_json <- rawToChar(res$content)
+# parsed_friendlies <- fromJSON(str_res_json)
 
 
 teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain", 
@@ -59,7 +60,7 @@ api_host <- "api-football-v1.p.rapidapi.com"
 infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
 seasons <- 2024
 leagues <- 10
-
+teams <- teams_euro2024
 
 
 get_past_matches <- function(leagues, seasons, teams, api_key, api_host){
@@ -78,14 +79,64 @@ get_past_matches <- function(leagues, seasons, teams, api_key, api_host){
                                  'x-rapidapi-host' = api_host))
     str_res_json <- rawToChar(res$content)
     parsed_lineups <- fromJSON(str_res_json)
-    lineup_df <- flatten_to_df(parsed_lineups$response)
-      
+    lineup_df <- flatten_to_df_lineup(parsed_lineups$response)
+    
     url <- paste(infinitif,"/fixtures/statistics/?fixture=",tib_df[i,"fixture.id"], sep = "")
     res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
                                  'x-rapidapi-host' = api_host))
     str_res_json <- rawToChar(res$content)
     parsed_stats <- fromJSON(str_res_json)
-    stats_df <- flatten_to_df(parsed_stats$response)
+    stats_df <- flatten_fixture_stats(parsed_stats$response) %>% select(-logo, -id) %>% t() 
+    colnames(stats_df) <- paste(stats_df['name',],stats_df['type',], sep = ".")
+    stats_df <- t(stats_df[!rownames(stats_df) %in% c("name", "type"),])
+    
+    final_fixture_row <- cbind(tib_df[i,], lineup_df, stats_df)
+    
+  }
+}
+
+
+teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain", 
+                    "Croatia", "Italy", "Albania", "Slovenia", "Denmark", 
+                    "Serbia", "England", "Poland", "Netherlands", "Austria",
+                    "France", "Belgium", "Slovakia", "Romania", "Ukraine",
+                    "Turkey", "Georgia", "Portugal", "Czech Republic")
+
+# Get list of games in the past
+api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_host <- "api-football-v1.p.rapidapi.com"
+infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
+seasons <- 2024
+leagues <- 10
+teams <- teams_euro2024
+
+
+get_past_matches <- function(leagues, seasons, teams, api_key, api_host){
+  
+  url <- paste(infinitif,"/fixtures/?league=",leagues,"&season=",seasons,"", sep = "")
+  res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                               'x-rapidapi-host' = api_host))
+  str_res_json <- rawToChar(res$content)
+  parsed_fixtures <- fromJSON(str_res_json)
+  tib_df <- flatten_to_df(parsed_fixtures$response)
+  tib_df <- tib_df %>% filter(teams.away.name %in% teams | teams.home.name %in% teams)
+  for (i in 1:dim(tib_df)[1]){
+    
+    url <- paste(infinitif,"/fixtures/lineups/?fixture=",tib_df[i,"fixture.id"], sep = "")
+    res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                                 'x-rapidapi-host' = api_host))
+    str_res_json <- rawToChar(res$content)
+    parsed_lineups <- fromJSON(str_res_json)
+    lineup_df <- flatten_to_df_lineup(parsed_lineups$response)
+    
+    url <- paste(infinitif,"/fixtures/statistics/?fixture=",tib_df[i,"fixture.id"], sep = "")
+    res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                                 'x-rapidapi-host' = api_host))
+    str_res_json <- rawToChar(res$content)
+    parsed_stats <- fromJSON(str_res_json)
+    stats_df <- flatten_fixture_stats(parsed_stats$response) %>% select(-logo, -id) %>% t() 
+    colnames(stats_df) <- paste(stats_df['name',],stats_df['type',], sep = ".")
+    stats_df <- stats_df[!rownames(stats_df) %in% c("name", "type"),]
     
     
   }

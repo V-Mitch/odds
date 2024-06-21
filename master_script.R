@@ -21,6 +21,12 @@ teams_repo = new("Teams_Repository")
 teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
 
 
+teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain", 
+                    "Croatia", "Italy", "Albania", "Slovenia", "Denmark", 
+                    "Serbia", "England", "Poland", "Netherlands", "Austria",
+                    "France", "Belgium", "Slovakia", "Romania", "Ukraine",
+                    "Turkey", "Georgia", "Portugal", "Czech Republic")
+
 
 library(data.table)
 
