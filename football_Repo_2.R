@@ -90,6 +90,12 @@ get_past_matches <- function(leagues, seasons, teams, api_key, api_host){
     colnames(stats_df) <- paste(stats_df['name',],stats_df['type',], sep = ".")
     stats_df <- t(stats_df[!rownames(stats_df) %in% c("name", "type"),])
     
+    url <- paste(infinitif,"/odds/?fixture=",tib_df[i,"fixture.id"], sep = "")
+    res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                                 'x-rapidapi-host' = api_host))
+    str_res_json <- rawToChar(res$content)
+    parsed_odds <- fromJSON(str_res_json)
+    
     final_fixture_row <- cbind(tib_df[i,], lineup_df, stats_df)
     
   }
