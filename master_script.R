@@ -30,7 +30,7 @@ teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain",
                     "Turkey", "Georgia", "Portugal", "Czech Republic")
 
 # Get list of games in the past
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_key <- ""
 api_host <- "api-football-v1.p.rapidapi.com"
 infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
 seasons <- 2024
