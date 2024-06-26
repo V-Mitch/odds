@@ -4,6 +4,8 @@ source("repo_class.R")
 source("DataHandlers.R")
 source("Calculations.R")
 source("football_Repo_2.R")
+library(tidymodels)
+library(rpart.plot)
 
 sports_repo = new("Sports_Repository")
 sports_repo = updateSportsFromAPI(sports_repo, all = "false")
@@ -29,66 +31,67 @@ teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain",
                     "France", "Belgium", "Slovakia", "Romania", "Ukraine",
                     "Turkey", "Georgia", "Portugal", "Czech Republic")
 
-# Get list of games in the past
+
+# Get list of games in the past 2024
 api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
 api_host <- "api-football-v1.p.rapidapi.com"
 infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
 seasons <- 2024
 leagues <- 10
-teams <- teams_euro2024
+fixtures_training_2024 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
+namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
+save(fixtures_training_2024, file = namefile)
+# load("2024-06-26__2024_leagues.RData")
 
-fixtures_training <- get_past_matches(leagues, seasons, teams, api_key, api_host, short_limit = 300)
+
+
+# Get list of games in the past 2023
+api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_host <- "api-football-v1.p.rapidapi.com"
+infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
+seasons <- 2023
+leagues <- 10
+fixtures_training_2023 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
 save(fixtures_training, file = namefile)
 
-# distinguish the data known post-game
-post_game_varnames <- c("team.1.Shots on Goal", 
-                        "team.1.Total Shots"        ,                
-                        "team.1.Shots insidebox"    ,                  
-                        "team.1.Fouls"              ,              
-                        "team.1.Offsides"           ,                  
-                        "team.1.Yellow Cards"       ,            
-                        "team.1.Goalkeeper Saves"   ,              
-                        "team.1.Passes accurate"    ,          
-                        "team.1.expected_goals"     ,                  
-                        "team.2.Shots on Goal"      ,                
-                        "team.2.Total Shots"        ,                
-                        "team.2.Shots insidebox"    ,                  
-                        "team.2.Fouls"              ,              
-                        "team.2.Offsides"           ,                  
-                        "team.2.Yellow Cards"       ,            
-                        "team.2.Goalkeeper Saves"   ,              
-                        "team.2.Passes accurate"    ,          
-                        "team.2.expected_goals"     ,
-                        "team.1.Shots off Goal"     ,             
-                        "team.1.Blocked Shots"      ,             
-                        "team.1.Shots outsidebox"   ,             
-                        "team.1.Corner Kicks"       ,             
-                        "team.1.Ball Possession"    ,             
-                        "team.1.Red Cards"          ,             
-                        "team.1.Total passes"       ,             
-                        "team.1.Passes %"           ,             
-                        "team.1.goals_prevented"    ,             
-                        "team.2.Shots off Goal"     ,             
-                        "team.2.Blocked Shots"      ,             
-                        "team.2.Shots outsidebox"   ,             
-                        "team.2.Corner Kicks"       ,             
-                        "team.2.Ball Possession"    ,             
-                        "team.2.Red Cards"          ,             
-                        "team.2.Total passes"       ,             
-                        "team.2.Passes %"           ,
-                        "teams.home.winner"         ,
-                        "teams.away.winner"         ,
-                        "goals.home"                ,                
-                        "goals.away"                ,                
-                        "score.halftime.home"       ,                
-                        "score.halftime.away"       ,                
-                        "score.fulltime.home"       ,                
-                        "score.fulltime.away"       ,                
-                        "score.extratime.home"      ,                
-                        "score.extratime.away"      ,                
-                        "score.penalty.home"        ,                
-                        "score.penalty.away"        )
+
+
+# Get list of games in the past 2022
+api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_host <- "api-football-v1.p.rapidapi.com"
+infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
+seasons <- 2022
+leagues <- 10
+fixtures_training_2022 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
+namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
+save(fixtures_training, file = namefile)
+
+
+# Get list of games in the past 2021
+api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_host <- "api-football-v1.p.rapidapi.com"
+infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
+seasons <- 2021
+leagues <- 10
+fixtures_training_2021 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
+namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
+save(fixtures_training, file = namefile)
+
+# Get list of games in the past 2020
+api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
+api_host <- "api-football-v1.p.rapidapi.com"
+infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
+seasons <- 2020
+leagues <- 10
+fixtures_training_2020 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
+namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
+save(fixtures_training, file = namefile)
+
+fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
+      fixtures_training_2023, fixtures_training_2024) %>% 
+      suppressMessages()
+
 
 # convert to numeric for better handling
 fixtures_training <- fixtures_training %>% 
@@ -96,47 +99,33 @@ fixtures_training <- fixtures_training %>%
 
 # function-to-be starts here
 
-calculate_averages <- function(fixture_dataframe, post_game_varnames, fixture_lookback = 5){
-  
-  
-  # arrange by date chronologically youngest to oldest game
-  fixture_dataframe <- fixture_dataframe %>%
-    arrange(desc(fixture.date))
-  df_averages <- data.frame(matrix(NA, ncol = length(post_game_varnames)*2, nrow = nrow(fixture_dataframe)))
-  for (i in 1:nrow(fixtures_training)){
-    remaining_fixtures <- fixture_dataframe[i:nrow(fixtures_training),]
-    
-    recent_fixtures <- remaining_fixtures %>%
-      slice(-1) %>% 
-      slice_head(n = fixture_lookback)
-    current_fixture <- remaining_fixtures %>%
-      slice(1)
-    
-    home_team <- current_fixture["teams.home.name"]
-    away_team <- current_fixture["teams.away.name"]
-    
-    
-    # Calculate the average of yellow cards for home home when they are the home team
-    home_avg_prior_5 <- remaining_fixtures %>%
-      filter(teams.home.name == home_team) %>%
-      summarise(across(all_of(post_game_varnames), ~ mean(., na.rm = TRUE)))
-    # colnames(home_avg_prior_5) <- paste0("avg.prev.5.","home", 
-    #                                      colnames(home_avg_prior_5))
-    # Calculate the average of yellow cards for away team when they are the away team
-    away_avg_prior_5 <- remaining_fixtures %>%
-      filter(teams.away.name == away_team) %>%
-      summarise(across(all_of(post_game_varnames), ~ mean(., na.rm = TRUE)))
-    # colnames(away_avg_prior_5) <- paste0("avg.prev.5.","away", 
-    #                                      colnames(away_avg_prior_5))
-    
-    df_averages[i,] <- bind_cols(home_avg_prior_5, away_avg_prior_5) %>% 
-      suppressMessages()
-    print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_training)))
-  }
-  colnames(df_averages) <- paste0("avg.prev.",fixture_lookback,".", post_game_varnames)
-  return(df_averages)
-}
 avg_df <- calculate_averages(fixtures_training, post_game_varnames, 5)
 
-# remove forward-looking bias variables
-fixtures_training[, !names(fixtures_training) %in% post_game_names]
+# de-select forward-looking bias variables, and add aggregated post_games
+full_set <- bind_cols(fixtures_training[, !names(fixtures_training) %in% post_game_varnames],avg_df) %>% 
+  suppressMessages()
+
+target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw", 
+                          ifelse(fixtures_training$teams.home.winner == 1, "home",
+                                 ifelse(is.na(fixtures_training$teams.home.winner), "draw", 
+                                        ifelse(fixtures_training$teams.home.winner == 0, "away", NA))))
+    
+full_set$outcome <- target_variable
+full_set$outcome <- as.factor(target_variable)
+# not enough levels for certain predictors
+full_set <- full_set %>% select(-fixture.referee)
+
+# REGRESSION TREE
+tree_spec <- decision_tree() %>% 
+  set_engine("rpart") %>% 
+  set_mode("classification")
+
+split_set <- initial_split(full_set, prop = 0.75, strata =outcome)
+train_set <- training(split_set)
+test_set <- testing(split_set)
+
+model <- tree_spec %>% 
+  fit(formula = outcome ~ ., data = train_set)
+tree_model <- extract_fit_engine(model)
+
+predict(model, new_data = test_set)
