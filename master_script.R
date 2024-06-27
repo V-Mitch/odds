@@ -6,6 +6,7 @@ source("Calculations.R")
 source("football_Repo_2.R")
 library(tidymodels)
 library(rpart.plot)
+library(caret)
 
 sports_repo = new("Sports_Repository")
 sports_repo = updateSportsFromAPI(sports_repo, all = "false")
@@ -42,7 +43,7 @@ fixtures_training_2024 <- get_past_matches(leagues, seasons, api_key, api_host, 
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
 save(fixtures_training_2024, file = namefile)
 # load("2024-06-26__2024_leagues.RData")
-
+Sys.sleep(60 + 1)
 
 
 # Get list of games in the past 2023
@@ -53,8 +54,8 @@ seasons <- 2023
 leagues <- 10
 fixtures_training_2023 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training, file = namefile)
-
+save(fixtures_training_2023, file = namefile)
+Sys.sleep(60 + 1)
 
 
 # Get list of games in the past 2022
@@ -65,8 +66,8 @@ seasons <- 2022
 leagues <- 10
 fixtures_training_2022 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training, file = namefile)
-
+save(fixtures_training_2022, file = namefile)
+Sys.sleep(60 + 1)
 
 # Get list of games in the past 2021
 api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
@@ -76,7 +77,8 @@ seasons <- 2021
 leagues <- 10
 fixtures_training_2021 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training, file = namefile)
+save(fixtures_training_2021, file = namefile)
+Sys.sleep(60 + 1)
 
 # Get list of games in the past 2020
 api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
@@ -86,7 +88,8 @@ seasons <- 2020
 leagues <- 10
 fixtures_training_2020 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training, file = namefile)
+save(fixtures_training_2020, file = namefile)
+Sys.sleep(60 + 1)
 
 fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
       fixtures_training_2023, fixtures_training_2024) %>% 
@@ -99,11 +102,14 @@ fixtures_training <- fixtures_training %>%
 
 # function-to-be starts here
 
-avg_df <- calculate_averages(fixtures_training, post_game_varnames, 5)
+avg_df <- calculate_averages(fixtures_training, post_game_varnames, 7)
+namefile <- paste0(Sys.Date(), "__", "avg_df")
+save(avg_df, file = namefile)
 
 # de-select forward-looking bias variables, and add aggregated post_games
 full_set <- bind_cols(fixtures_training[, !names(fixtures_training) %in% post_game_varnames],avg_df) %>% 
   suppressMessages()
+
 
 target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw", 
                           ifelse(fixtures_training$teams.home.winner == 1, "home",
@@ -113,7 +119,7 @@ target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw",
 full_set$outcome <- target_variable
 full_set$outcome <- as.factor(target_variable)
 # not enough levels for certain predictors
-full_set <- full_set %>% select(-fixture.referee)
+# full_set <- full_set %>% select(-fixture.referee)
 
 # REGRESSION TREE
 tree_spec <- decision_tree() %>% 
@@ -123,6 +129,8 @@ tree_spec <- decision_tree() %>%
 split_set <- initial_split(full_set, prop = 0.75, strata =outcome)
 train_set <- training(split_set)
 test_set <- testing(split_set)
+
+
 
 model <- tree_spec %>% 
   fit(formula = outcome ~ ., data = train_set)
