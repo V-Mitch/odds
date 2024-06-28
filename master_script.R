@@ -92,6 +92,14 @@ namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
 save(fixtures_training_2020, file = namefile)
 Sys.sleep(60 + 1)
 
+# load("2024-06-26__2024_leagues.RData")
+# load("2024-06-26__2024_leagues.RData")
+# load("2024-06-26__2024_leagues.RData")
+# load("2024-06-26__2024_leagues.RData")
+# load("2024-06-26__2024_leagues.RData")
+
+
+# Combine the different years together
 fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
       fixtures_training_2023, fixtures_training_2024) %>% 
       suppressMessages()
@@ -102,7 +110,6 @@ fixtures_training <- fixtures_training %>%
   mutate(across(all_of(post_game_varnames), as.numeric))
 
 # function-to-be starts here
-
 avg_df <- calculate_averages(fixtures_training, post_game_varnames, 7)
 namefile <- paste0(Sys.Date(), "__", "avg_df")
 save(avg_df, file = namefile)
