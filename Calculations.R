@@ -145,3 +145,16 @@ post_game_varnames <- c("team.1.Shots on Goal",
                         "score.extratime.away"      ,                
                         "score.penalty.home"        ,                
                         "score.penalty.away"        )
+
+redundant_varnames <- c("fixture.timezone", 
+                        "fixture.venue.id",
+                        "fixture.status.short",
+                        "league.id",
+                        "league.logo",
+                        "league.flag",
+                        "teams.home.id",
+                        "teams.home.logo",
+                        "teams.home.winner",
+                        "teams.away.id",
+                        "teams.away.logo",
+                        "teams.away.winner")

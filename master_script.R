@@ -7,6 +7,7 @@ source("football_Repo_2.R")
 library(tidymodels)
 library(rpart.plot)
 library(caret)
+setwd("C:/Users/victo/OneDrive/Spectre/R tests/Betting")
 
 # test 3
 sports_repo = new("Sports_Repository")
@@ -90,22 +91,22 @@ leagues <- 10
 fixtures_training_2020 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
 namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
 save(fixtures_training_2020, file = namefile)
-Sys.sleep(60 + 1)
-
-# load("2024-06-26__2024_leagues.RData")
-# load("2024-06-26__2024_leagues.RData")
-# load("2024-06-26__2024_leagues.RData")
-# load("2024-06-26__2024_leagues.RData")
-# load("2024-06-26__2024_leagues.RData")
 
 
-# Combine the different years together
+load("2024-06-27__avg_df")
+load("2024-06-28__2020_leagues")
+load("2024-06-27__2021_leagues")
+load("2024-06-27__2022_leagues")
+load("2024-06-27__2023_leagues")
+load("2024-06-27__2024_leagues")
+
+
+# Combine the different years together from the raw datasets
 fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
       fixtures_training_2023, fixtures_training_2024) %>% 
       suppressMessages()
 
-
-# convert to numeric for better handling
+# convert some to numeric for better handling
 fixtures_training <- fixtures_training %>% 
   mutate(across(all_of(post_game_varnames), as.numeric))
 
@@ -116,6 +117,7 @@ save(avg_df, file = namefile)
 
 # de-select forward-looking bias variables, and add aggregated post_games
 full_set <- bind_cols(fixtures_training[, !names(fixtures_training) %in% post_game_varnames],avg_df) %>% 
+            select(-redundant_vars)
   suppressMessages()
 
 
