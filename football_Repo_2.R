@@ -6,7 +6,7 @@ library(purrr)
 library(dplyr)
 library(tidyr)
 library(caret)
-source("stack_player_data.R")
+# source("stack_player_data.R")
 
 # queryString <- list(
 #   league = "39",

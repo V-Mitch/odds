@@ -9,10 +9,14 @@ library(ranger)
 library(randomForest)
 library(rpart.plot)
 library(caret)
+<<<<<<< HEAD
 library(ggplot2)
 library(reshape2)  
 library(vip)
 
+=======
+setwd("C:/Users/victo/OneDrive/Spectre/R tests/Betting")
+>>>>>>> cd2b9cadbedd2d3ea4e35599ffc369d24049178a
 
 # test 3
 sports_repo = new("Sports_Repository")
@@ -106,6 +110,7 @@ load("2024-06-27__2023_leagues")
 load("2024-06-27__2024_leagues")
 
 
+
 # Combine the different years together from the raw datasets
 fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
                                fixtures_training_2023, fixtures_training_2024) %>% 
@@ -115,7 +120,6 @@ fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, f
 fixtures_training <- fixtures_training %>% 
   mutate(across(all_of(post_game_varnames), as.numeric))
 
-
 # FEATURE ENGINEERING
 #Functions
 avg_df <- calculate_averages(fixtures_training, post_game_varnames, 
@@ -123,7 +127,6 @@ avg_df <- calculate_averages(fixtures_training, post_game_varnames,
                              weighting = "linear")
 fixtures_training <- calculate_time_diff(fixtures_training)
 # games_played_recent <- 
-
 namefile <- paste0(Sys.Date(), "__", "avg_df")
 save(avg_df, file = namefile)
 # de-select forward-looking bias variables, and add aggregated post_games
