@@ -11,6 +11,7 @@ library(rpart.plot)
 library(caret)
 library(ggplot2)
 library(reshape2)  
+library(vip)
 
 
 # test 3
@@ -121,7 +122,7 @@ avg_df <- calculate_averages(fixtures_training, post_game_varnames,
                              fixture_lookback = 15,
                              weighting = "linear")
 fixtures_training <- calculate_time_diff(fixtures_training)
-games_played_recent <- 
+# games_played_recent <- 
 
 namefile <- paste0(Sys.Date(), "__", "avg_df")
 save(avg_df, file = namefile)
@@ -148,6 +149,9 @@ clean_set <- clean_set[rowSums(is.na(clean_set)) <= 50, ]
 # impute the missing averages with a median
 clean_set <- clean_set %>% 
   mutate(across(where(is.numeric), ~replace_na(., median(., na.rm=TRUE))))
+
+character_cols <- sapply(clean_set, is.character)
+clean_set[, character_cols][is.na(clean_set[, character_cols])] <- "no-value"
 clean_set[is.na(clean_set)] <- -1
 # only want finished games included - forward-looking variable
 clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
@@ -155,13 +159,13 @@ clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed
 
 
 # REGRESSION TREE
-save.image(file = paste0(Sys.Date(),"ready_for_execution.RData"))
-load("2024-06-30ready_for_execution.RData")
-forest_spec <- rand_forest(trees = 20000, 
+save.image(file = paste0(Sys.Date(),"ready_for_execution_afternoon.RData"))
+# load("2024-06-30ready_for_execution.RData")
+forest_spec <- rand_forest(trees = 10000, 
                            min_n = 1, 
-                           mtry = 96, 
-                           mode = "classification",
-                           engine = "randomForest") 
+                           mtry = 98, 
+                           mode = "classification") %>% 
+  set_engine("ranger", importance = "impurity")
 
 split_set <- initial_split(clean_set, prop = 0.75, strata =outcome)
 train_set <- training(split_set)
@@ -182,4 +186,4 @@ confusionMatrix(predictions$.pred_class, test_set$outcome)
 
 # INTERPRET
 tree_model <- extract_fit_engine(model)
-varImpPlot(tree_model)
+vip(tree_model)
