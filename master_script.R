@@ -4,19 +4,17 @@ source("repo_class.R")
 source("DataHandlers.R")
 source("Calculations.R")
 source("football_Repo_2.R")
+source("api.R")
 library(tidymodels)
 library(ranger)
 library(randomForest)
 library(rpart.plot)
 library(caret)
-<<<<<<< HEAD
 library(ggplot2)
 library(reshape2)  
 library(vip)
 
-=======
 setwd("C:/Users/victo/OneDrive/Spectre/R tests/Betting")
->>>>>>> cd2b9cadbedd2d3ea4e35599ffc369d24049178a
 
 # test 3
 sports_repo = new("Sports_Repository")
@@ -44,63 +42,6 @@ teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain",
                     "Turkey", "Georgia", "Portugal", "Czech Republic")
 
 
-# Get list of games in the past 2024
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
-api_host <- "api-football-v1.p.rapidapi.com"
-infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
-seasons <- 2024
-leagues <- 10
-fixtures_training_2024 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
-namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training_2024, file = namefile)
-# load("2024-06-26__2024_leagues.RData")
-Sys.sleep(60 + 1)
-
-
-# Get list of games in the past 2023
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
-api_host <- "api-football-v1.p.rapidapi.com"
-infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
-seasons <- 2023
-leagues <- 10
-fixtures_training_2023 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
-namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training_2023, file = namefile)
-Sys.sleep(60 + 1)
-
-
-# Get list of games in the past 2022
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
-api_host <- "api-football-v1.p.rapidapi.com"
-infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
-seasons <- 2022
-leagues <- 10
-fixtures_training_2022 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
-namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training_2022, file = namefile)
-Sys.sleep(60 + 1)
-
-# Get list of games in the past 2021
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
-api_host <- "api-football-v1.p.rapidapi.com"
-infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
-seasons <- 2021
-leagues <- 10
-fixtures_training_2021 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
-namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training_2021, file = namefile)
-Sys.sleep(60 + 1)
-
-# Get list of games in the past 2020
-api_key <- "9ae62b4f01msh4629643f4c38fc4p120e63jsn812161bafbe6"
-api_host <- "api-football-v1.p.rapidapi.com"
-infinitif <- "https://api-football-v1.p.rapidapi.com/v3"
-seasons <- 2020
-leagues <- 10
-fixtures_training_2020 <- get_past_matches(leagues, seasons, api_key, api_host, short_limit = 300)
-namefile <- paste0(Sys.Date(), "__", seasons,"_", "leagues")
-save(fixtures_training_2020, file = namefile)
-
 
 load("2024-06-27__avg_df")
 load("2024-06-28__2020_leagues")
@@ -108,7 +49,6 @@ load("2024-06-27__2021_leagues")
 load("2024-06-27__2022_leagues")
 load("2024-06-27__2023_leagues")
 load("2024-06-27__2024_leagues")
-
 
 
 # Combine the different years together from the raw datasets
