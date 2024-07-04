@@ -45,7 +45,7 @@ teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain",
 
 
 load("2024-06-27__avg_df")
-x1 <- load("2024-06-28__2020_leagues_friendlies")
+x1 <- load_and_assign("2024-06-28__2020_leagues_friendlies", "x1")
 x2 <- load("2024-06-27__2021_leagues_friendlies")
 x3 <- load("2024-06-27__2022_leagues_friendlies")
 x4 <- load("2024-06-27__2023_leagues_friendlies")
