@@ -31,5 +31,21 @@ extract_over_row <- function(data){
   return(final_df)
 }
 
-
-
+batch_from_api <- function(leagues = 10, 
+                           seasons = 2024, 
+                           api_key = api_key, 
+                           api_host = api_host, 
+                           short_limit = 300){
+  for (i in 1:length(leagues)){
+    for(j in 1:length(seasons)){
+      temp_matches <- get_past_matches(leagues = leagues[i], 
+                                       seasons = seasons[j], 
+                                       api_key = api_key, 
+                                       api_host = api_host, 
+                                       short_limit = short_limit)
+    }
+  }
+  namefile <- paste0(Sys.Date(), "__", seasons,"_", leagues)
+  save(temp_matches, file = namefile)
+  Sys.sleep(60 + 1)
+}

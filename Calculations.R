@@ -61,7 +61,7 @@ calculate_averages <- function(fixture_dataframe,
   # arrange by date chronologically youngest to oldest game
   fixture_dataframe <- fixture_dataframe %>%
     arrange(desc(fixture.date))
-  df_averages <- data.frame(matrix(NA, ncol = length(post_game_varnames)*3-2, nrow = nrow(fixture_dataframe)))
+  df_averages <- data.frame(matrix(NA, ncol = length(post_game_varnames)*3-2, nrow = 0))
   
   weights <- switch(weighting,
                     "normal" = rep(1, length.out = fixture_lookback),
@@ -94,7 +94,7 @@ calculate_averages <- function(fixture_dataframe,
     names(df) <- gsub("temp", "away", names(df))
     return(df)
   }
-  
+  # for (i in 250:270){
   for (i in 1:nrow(fixture_dataframe)){
     remaining_fixtures <- fixture_dataframe[i:nrow(fixture_dataframe),]
     current_fixture <- remaining_fixtures %>%
@@ -112,7 +112,7 @@ calculate_averages <- function(fixture_dataframe,
                teams.away.name == as.character(away_team)) %>%
       slice(-1) %>% 
       slice_head(n = fixture_lookback)
-
+    
     home_prior_as_away  <- home_prior_5 %>%
       filter(teams.away.name == as.character(home_team)) %>% 
       swap_column_names()
@@ -130,13 +130,24 @@ calculate_averages <- function(fixture_dataframe,
       arrange(desc(fixture.date))
     # Calculate the average of yellow cards for home home when they are the home team
     # Use a loop to mutate the data frame, adding new columns for each difference
+    if(nrow(home_prior_5) == 0){
+      home_prior_5 <- home_prior_5 %>% add_row() %>% 
+        mutate(across(everything(), as.numeric))
+    } 
+    if(nrow(away_prior_5) == 0){
+      away_prior_5 <- away_prior_5 %>% add_row() %>% 
+        mutate(across(everything(), as.numeric))
+    } 
     for (j in seq_along(unique_vars_t1)) {
       var_temp <- unique_vars_t1[j]
       home_prior_5 <- home_prior_5 %>%
-        mutate(!!diff_vars_t1[j] := .data[[paste0("team.1.", var_temp)]] - .data[[paste0("team.2.", var_temp)]])
+        mutate(!!diff_vars_t1[j] := .data[[paste0("team.1.", var_temp)]] - 
+                 .data[[paste0("team.2.", var_temp)]])
       away_prior_5 <- away_prior_5 %>%
-        mutate(!!diff_vars_t1[j] := .data[[paste0("team.1.", var_temp)]] - .data[[paste0("team.2.", var_temp)]])
+        mutate(!!diff_vars_t1[j] := .data[[paste0("team.1.", var_temp)]] - 
+                 .data[[paste0("team.2.", var_temp)]])
     }
+    
     for (j in seq_along(unique_vars_t2)) {
       var_temp <- unique_vars_t2[j]
       var_temp <- gsub("\\.(home|away)", "", var_temp)
@@ -147,13 +158,13 @@ calculate_averages <- function(fixture_dataframe,
         mutate(!!diff_vars_t2[j] := .data[[paste0(var_temp,".home")]] - 
                  .data[[paste0(var_temp, ".away")]])
     }
-
+    
     if(nrow(home_prior_5)>0){
-    weights_temp <- weights[1:nrow(home_prior_5)]
-    avgs_for_home_team <- home_prior_5 %>% 
-      summarise(across(all_of(c(post_game_varnames,
-                                diff_vars_t1, diff_vars_t2)), 
-                       ~ weighted.mean(., w = weights_temp, na.rm = TRUE)))
+      weights_temp <- weights[1:nrow(home_prior_5)]
+      avgs_for_home_team <- home_prior_5 %>% 
+        summarise(across(all_of(c(post_game_varnames,
+                                  diff_vars_t1, diff_vars_t2)), 
+                         ~ weighted.mean(., w = weights_temp, na.rm = TRUE)))
     }else{
       column_names <- unique(c(post_game_varnames,
                                diff_vars_t1, diff_vars_t2))
@@ -162,11 +173,11 @@ calculate_averages <- function(fixture_dataframe,
       avgs_for_home_team <- df %>% add_row()
     }
     if(nrow(away_prior_5)>0){
-    weights_temp <- weights[1:nrow(away_prior_5)]
-    avgs_for_away_team <- away_prior_5 %>% 
-      summarise(across(all_of(c(post_game_varnames,
-                                diff_vars_t1, diff_vars_t2)), 
-                       ~ weighted.mean(., w = weights_temp, na.rm = TRUE)))
+      weights_temp <- weights[1:nrow(away_prior_5)]
+      avgs_for_away_team <- away_prior_5 %>% 
+        summarise(across(all_of(c(post_game_varnames,
+                                  diff_vars_t1, diff_vars_t2)), 
+                         ~ weighted.mean(., w = weights_temp, na.rm = TRUE)))
     }else{
       column_names <- unique(c(post_game_varnames,
                                diff_vars_t1, diff_vars_t2))
@@ -176,18 +187,22 @@ calculate_averages <- function(fixture_dataframe,
     }
     colnames(avgs_for_home_team) <- paste0("crthome.", colnames(avgs_for_home_team))
     colnames(avgs_for_away_team) <- paste0("crtaway.", colnames(avgs_for_away_team))
-    colnames(df_averages) <- c(paste0(colnames(avgs_for_home_team)),
-                               paste0(colnames(avgs_for_away_team)))
-
-    df_averages <- bind_rows(df_averages,
-                             bind_cols(avgs_for_home_team, avgs_for_away_team)) %>% 
-      suppressMessages() 
+    length_variable_names <- length(avgs_for_home_team) + length(avgs_for_away_team)
+    colnames(df_averages)[1:length_variable_names] <- c(
+      paste0(colnames(avgs_for_home_team)),
+      paste0(colnames(avgs_for_away_team)))
     
-    print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
+    df_averages <- bind_rows(df_averages,
+                             bind_cols(data.frame("fixture.id" = current_fixture$fixture.id),
+                                       avgs_for_home_team, 
+                                       avgs_for_away_team)) %>% 
+      suppressMessages() 
+      print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
     
   }
   colnames(df_averages) <- c(paste0(colnames(avgs_for_home_team)),
-                          paste0(colnames(avgs_for_away_team)))
+                             paste0(colnames(avgs_for_away_team)),
+                             "fixture.id")
   return(df_averages)
 }
 
