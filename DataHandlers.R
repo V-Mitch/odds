@@ -49,3 +49,10 @@ batch_from_api <- function(leagues = 10,
   save(temp_matches, file = namefile)
   Sys.sleep(60 + 1)
 }
+
+load_and_assign <- function(file, varname) {
+  load(file)
+  obj_name <- ls()[1]  # Get the name of the loaded object
+  assign(varname, get(obj_name), envir = .GlobalEnv)
+  rm(list = obj_name)  # Remove the object from the global environment
+}
