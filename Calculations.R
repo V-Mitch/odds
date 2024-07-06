@@ -67,8 +67,12 @@ calculate_averages <- function(fixture_dataframe,
                     "normal" = rep(1, length.out = fixture_lookback),
                     "linear" = seq(1, 0, length.out = fixture_lookback),
                     "exponential" = exp(seq(-1, -fixture_lookback, 
-                                            length.out = fixture_lookback))
-  )
+                                            length.out = fixture_lookback)),
+                    "soft" = exp(seq(-1, -fixture_lookback, 
+                                     length.out = fixture_lookback))^0.25 /
+                    sum(exp(seq(-1, -fixture_lookback, 
+                                  length.out = fixture_lookback))^0.25)
+                    )
   # Which variables should have the difference taken?
   
   comparison_vars_t1 <- post_game_varnames[grepl("team\\.1\\.|team\\.2\\.", post_game_varnames)]
@@ -113,6 +117,8 @@ calculate_averages <- function(fixture_dataframe,
       slice(-1) %>% 
       slice_head(n = fixture_lookback)
     
+    # only select when current home team was playing in the past as:
+    # home and away team (swap the latter so calculations work later)
     home_prior_as_away  <- home_prior_5 %>%
       filter(teams.away.name == as.character(home_team)) %>% 
       swap_column_names()
@@ -120,7 +126,7 @@ calculate_averages <- function(fixture_dataframe,
       filter(teams.home.name == as.character(home_team))
     home_prior_5 <- bind_rows(home_prior_as_home, home_prior_as_away) %>% 
       arrange(desc(fixture.date))
-    
+    # same for current away team
     away_prior_as_away  <- away_prior_5 %>%
       filter(teams.away.name == as.character(away_team)) %>% 
       swap_column_names()
@@ -128,8 +134,8 @@ calculate_averages <- function(fixture_dataframe,
       filter(teams.home.name == as.character(away_team))
     away_prior_5 <- bind_rows(away_prior_as_home, away_prior_as_away) %>% 
       arrange(desc(fixture.date))
-    # Calculate the average of yellow cards for home home when they are the home team
-    # Use a loop to mutate the data frame, adding new columns for each difference
+
+    # in case of empty past 5 matches, ensure theres a NaN placeholder
     if(nrow(home_prior_5) == 0){
       home_prior_5 <- home_prior_5 %>% add_row() %>% 
         mutate(across(everything(), as.numeric))
@@ -138,6 +144,8 @@ calculate_averages <- function(fixture_dataframe,
       away_prior_5 <- away_prior_5 %>% add_row() %>% 
         mutate(across(everything(), as.numeric))
     } 
+    
+    # 
     for (j in seq_along(unique_vars_t1)) {
       var_temp <- unique_vars_t1[j]
       home_prior_5 <- home_prior_5 %>%
@@ -160,7 +168,8 @@ calculate_averages <- function(fixture_dataframe,
     }
     
     if(nrow(home_prior_5)>0){
-      weights_temp <- weights[1:nrow(home_prior_5)]
+      weights_temp <- weights[1:nrow(home_prior_5)] / 
+        sum(weights[1:nrow(home_prior_5)])
       avgs_for_home_team <- home_prior_5 %>% 
         summarise(across(all_of(c(post_game_varnames,
                                   diff_vars_t1, diff_vars_t2)), 
@@ -173,7 +182,8 @@ calculate_averages <- function(fixture_dataframe,
       avgs_for_home_team <- df %>% add_row()
     }
     if(nrow(away_prior_5)>0){
-      weights_temp <- weights[1:nrow(away_prior_5)]
+      weights_temp <- weights[1:nrow(away_prior_5)] / 
+        sum(weights[1:nrow(away_prior_5)])
       avgs_for_away_team <- away_prior_5 %>% 
         summarise(across(all_of(c(post_game_varnames,
                                   diff_vars_t1, diff_vars_t2)), 
@@ -185,6 +195,7 @@ calculate_averages <- function(fixture_dataframe,
       colnames(df) <- column_names
       avgs_for_away_team <- df %>% add_row()
     }
+    
     colnames(avgs_for_home_team) <- paste0("crthome.", colnames(avgs_for_home_team))
     colnames(avgs_for_away_team) <- paste0("crtaway.", colnames(avgs_for_away_team))
     length_variable_names <- length(avgs_for_home_team) + length(avgs_for_away_team)
@@ -197,7 +208,7 @@ calculate_averages <- function(fixture_dataframe,
                                        avgs_for_home_team, 
                                        avgs_for_away_team)) %>% 
       suppressMessages() 
-      print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
+    print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
     
   }
   colnames(df_averages) <- c(paste0(colnames(avgs_for_home_team)),

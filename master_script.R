@@ -16,19 +16,19 @@ library(vip)
 library(pdp)
 library(miceadds)
 
-setwd("C:/Users/victo/OneDrive/Spectre/R tests/Betting")
-
-# test 3
 sports_repo = new("Sports_Repository")
 sports_repo = updateSportsFromAPI(sports_repo, all = "false")
 sports_repo@data$title
 
 events_repo = new("Events_Repository")
-events_repo = updateEventsFromAPI(events_repo, sport = "soccer_uefa_european_championship")
+events_repo = updateEventsFromAPI(events_repo, 
+                                  sport = "soccer_uefa_european_championship")
 
 
 odds_repo = new("Odds_Repository")
-odds_repo = updateOddsFromAPI(odds_repo, sport = "soccer_uefa_european_championship", market = "h2h", regions = "uk,eu")
+odds_repo = updateOddsFromAPI(odds_repo, 
+                              sport = "soccer_uefa_european_championship", 
+                              market = "h2h", regions = "uk,eu")
 
 odds_table = extract_over_row(odds_repo@data)
 odds_table[odds_table["key"] == "betfair_ex_eu",]
@@ -94,15 +94,14 @@ load.Rdata("2024-07-05__2022_37", "df35")
 load.Rdata("2024-07-05__2018_37", "df36")
 load.Rdata("2024-07-05__2014_37", "df37")
 # (new)
-load.Rdata("2024-07-05__2023_38", "df38")
-load.Rdata("2024-07-05__2021_38", "df39")
-load.Rdata("2024-07-05__2017_38", "df40")
-df_list <- mget(paste0("df", 1:40))
+# load.Rdata("2024-07-05__2023_38", "df38")
+# load.Rdata("2024-07-05__2021_38", "df39")
+# load.Rdata("2024-07-05__2017_38", "df40")
+df_list <- mget(paste0("df", 1:37))
 # Combine the different years together from the raw datasets
 # fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
 #                                fixtures_training_2023, fixtures_training_2024) %>% 
-  fixtures_training <- bind_rows(df_list)
-  suppressMessages()
+fixtures_training <- bind_rows(df_list)
 
 # convert some to numeric for better handling
 fixtures_training <- fixtures_training %>% 
@@ -114,12 +113,12 @@ fixtures_training <- fixtures_training %>%
 fixtures_training <- fixtures_training %>% arrange(desc(fixture.date))
 
 avg_df <- calculate_averages(fixtures_training, post_game_varnames, 
-                             fixture_lookback = 5,
-                             weighting = "normal")
+                             fixture_lookback = 20,
+                             weighting = "soft")
 
 fixtures_training <- calculate_time_diff(fixtures_training)
 # games_played_recent <- 
-namefile <- paste0(Sys.Date(), "__", "avg_df2")
+namefile <- paste0(Sys.Date(), "__", "avg_df3")
 save(avg_df, file = namefile)
 # setting the output variable
 target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw",
@@ -130,9 +129,9 @@ fixtures_training$outcome <- as.factor(target_variable)
 # de-select forward-looking bias variables, and add aggregated post_games
 fixtures_training <- fixtures_training[!duplicated(fixtures_training),]
 avg_df <- avg_df[!duplicated(avg_df$fixture.id),]
-full_set <- left_join(fixtures_training[, !names(fixtures_training) %in% post_game_varnames], avg_df,
+full_set <- left_join(
+  fixtures_training[, !names(fixtures_training) %in% post_game_varnames], avg_df,
                       by = "fixture.id") %>% 
-# full_set <- bind_cols(fixtures_training[, !names(fixtures_training) %in% post_game_varnames],avg_df) %>% 
   select(-any_of(redundant_vars)) %>% 
   suppressMessages()
 
@@ -161,13 +160,13 @@ target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.e
 clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
 clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed))
 
-# Calculate class frequencies
-class_counts <- table(train_set$outcome)
-total_samples <- sum(class_counts)
-# Calculate class weights (inverse frequency)
-class_weights <- total_samples / (length(class_counts) * class_counts)
-# Assign weights to each instance in the training set
-instance_weights <- sapply(train_set$outcome, function(x) class_weights[x])
+# # Calculate class frequencies
+# class_counts <- table(train_set$outcome)
+# total_samples <- sum(class_counts)
+# # Calculate class weights (inverse frequency)
+# class_weights <- total_samples / (length(class_counts) * class_counts)
+# # Assign weights to each instance in the training set
+# instance_weights <- sapply(train_set$outcome, function(x) class_weights[x])
 
 # REGRESSION TREE
 save.image(file = paste0(Sys.Date(),"ready_for_execution_5_eve.RData"))
@@ -176,8 +175,8 @@ forest_spec <- rand_forest(trees = 10000,
                            min_n = 1, 
                            mtry = round(sqrt(ncol(clean_set))), 
                            mode = "classification") %>% 
-  set_engine("ranger", importance = "impurity", case.weights = instance_weights)
-
+  set_engine("ranger", importance = "impurity")
+             # , case.weights = instance_weights)
 split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
 train_set <- training(split_set)
 test_set <- testing(split_set)
