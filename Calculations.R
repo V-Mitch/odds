@@ -61,7 +61,7 @@ calculate_averages <- function(fixture_dataframe,
   # arrange by date chronologically youngest to oldest game
   fixture_dataframe <- fixture_dataframe %>%
     arrange(desc(fixture.date))
-  df_averages <- data.frame(matrix(NA, ncol = length(post_game_varnames)*3-2, nrow = 0))
+  df_averages <- list()
   
   weights <- switch(weighting,
                     "normal" = rep(1, length.out = fixture_lookback),
@@ -168,8 +168,7 @@ calculate_averages <- function(fixture_dataframe,
     }
     
     if(nrow(home_prior_5)>0){
-      weights_temp <- weights[1:nrow(home_prior_5)] / 
-        sum(weights[1:nrow(home_prior_5)])
+      weights_temp <- weights[1:nrow(home_prior_5)] / sum(weights[1:nrow(home_prior_5)])
       avgs_for_home_team <- home_prior_5 %>% 
         summarise(across(all_of(c(post_game_varnames,
                                   diff_vars_t1, diff_vars_t2)), 
@@ -182,8 +181,7 @@ calculate_averages <- function(fixture_dataframe,
       avgs_for_home_team <- df %>% add_row()
     }
     if(nrow(away_prior_5)>0){
-      weights_temp <- weights[1:nrow(away_prior_5)] / 
-        sum(weights[1:nrow(away_prior_5)])
+      weights_temp <- weights[1:nrow(away_prior_5)] / sum(weights[1:nrow(away_prior_5)])
       avgs_for_away_team <- away_prior_5 %>% 
         summarise(across(all_of(c(post_game_varnames,
                                   diff_vars_t1, diff_vars_t2)), 
@@ -196,24 +194,43 @@ calculate_averages <- function(fixture_dataframe,
       avgs_for_away_team <- df %>% add_row()
     }
     
-    colnames(avgs_for_home_team) <- paste0("crthome.", colnames(avgs_for_home_team))
-    colnames(avgs_for_away_team) <- paste0("crtaway.", colnames(avgs_for_away_team))
-    length_variable_names <- length(avgs_for_home_team) + length(avgs_for_away_team)
-    colnames(df_averages)[1:length_variable_names] <- c(
-      paste0(colnames(avgs_for_home_team)),
-      paste0(colnames(avgs_for_away_team)))
+    current_teams_differences <- avgs_for_home_team - avgs_for_away_team
+    # colnames(current_teams_differences) <- paste0("crtteams.diff.", 
+    #                                               colnames(current_teams_differences))
+    # colnames(avgs_for_home_team) <- paste0("crthome.", colnames(avgs_for_home_team))
+    # colnames(avgs_for_away_team) <- paste0("crtaway.", colnames(avgs_for_away_team))
+    # length_variable_names <- length(avgs_for_home_team) + 
+    #   length(avgs_for_away_team) + 
+    #   length(current_teams_differences)
+    # browser()
+    # df_averages <- df_averages[, -which(is.na(names(df_averages)))]
+    # colnames(df_averages)[1:length_variable_names] <- c(
+    #   paste0(colnames(avgs_for_home_team)),
+    #   paste0(colnames(avgs_for_away_team)),
+    #   colnames(current_teams_differences))
+    # 
+    # df_averages <- bind_rows(df_averages,
+    #                          bind_cols(avgs_for_home_team, 
+    #                                    avgs_for_away_team, 
+    #                                    current_teams_differences,
+    #                                    data.frame("fixture.id" = current_fixture$fixture.id))) %>% 
+    #   suppressMessages() 
+
     
-    df_averages <- bind_rows(df_averages,
-                             bind_cols(data.frame("fixture.id" = current_fixture$fixture.id),
-                                       avgs_for_home_team, 
-                                       avgs_for_away_team)) %>% 
-      suppressMessages() 
+    df_averages[[i]] <- c(avgs_for_home_team, avgs_for_away_team, current_teams_differences, current_fixture$fixture.id)
     print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
-    
+    # browser()
   }
+
+  
+  df_averages <- do.call(rbind, df_averages)
   colnames(df_averages) <- c(paste0(colnames(avgs_for_home_team)),
                              paste0(colnames(avgs_for_away_team)),
+                             paste0(colnames(current_teams_differences)),
                              "fixture.id")
+  rownames(df_averages) <- NULL
+  df_averages <- as.data.frame(lapply(as.data.frame(df_averages), function(x) sapply(x, unlist)))
+    
   return(df_averages)
 }
 

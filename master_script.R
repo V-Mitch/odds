@@ -116,10 +116,13 @@ avg_df <- calculate_averages(fixtures_training, post_game_varnames,
                              fixture_lookback = 20,
                              weighting = "soft")
 
+avg_df <- as.data.frame(lapply(avg_df, function(x) sapply(x, unlist)))
+
 fixtures_training <- calculate_time_diff(fixtures_training)
 # games_played_recent <- 
-namefile <- paste0(Sys.Date(), "__", "avg_df3")
+namefile <- paste0(Sys.Date(), "__", "avg_df_9thjul")
 save(avg_df, file = namefile)
+# load(namefile)
 # setting the output variable
 target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw",
                           ifelse(fixtures_training$teams.home.winner == 1, "home",
@@ -142,7 +145,7 @@ full_set <- left_join(
 # remove full NaN column
 clean_set <- full_set[, colSums(is.na(full_set)) < nrow(full_set)]
 # remove dirty rows with very little data
-clean_set <- clean_set[rowSums(is.na(clean_set)) <= 105, ]
+clean_set <- clean_set[rowSums(is.na(clean_set)) <= 164, ]
 # clean_set %>%
 #   summarise(across(everything(), ~ sum(is.na(.))))
 # impute the missing averages with a median
@@ -160,13 +163,13 @@ target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.e
 clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
 clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed))
 
-# # Calculate class frequencies
-# class_counts <- table(train_set$outcome)
-# total_samples <- sum(class_counts)
-# # Calculate class weights (inverse frequency)
-# class_weights <- total_samples / (length(class_counts) * class_counts)
-# # Assign weights to each instance in the training set
-# instance_weights <- sapply(train_set$outcome, function(x) class_weights[x])
+# Calculate class frequencies
+class_counts <- table(train_set$outcome)
+total_samples <- sum(class_counts)
+# Calculate class weights (inverse frequency)
+class_weights <- total_samples / (length(class_counts) * class_counts)
+# Assign weights to each instance in the training set
+instance_weights <- sapply(train_set$outcome, function(x) class_weights[x])
 
 # REGRESSION TREE
 save.image(file = paste0(Sys.Date(),"ready_for_execution_5_eve.RData"))
@@ -175,8 +178,8 @@ forest_spec <- rand_forest(trees = 10000,
                            min_n = 1, 
                            mtry = round(sqrt(ncol(clean_set))), 
                            mode = "classification") %>% 
-  set_engine("ranger", importance = "impurity")
-             # , case.weights = instance_weights)
+  set_engine("ranger", importance = "impurity", case.weights = instance_weights)
+             # 
 split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
 train_set <- training(split_set)
 test_set <- testing(split_set)
