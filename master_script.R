@@ -5,6 +5,7 @@ source("DataHandlers.R")
 source("Calculations.R")
 source("football_Repo_2.R")
 source("api.R")
+source("Manual_data_loads.R")
 library(tidymodels)
 library(ranger)
 library(randomForest)
@@ -45,102 +46,96 @@ teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain",
 
 
 
-# load("2024-06-27__avg_df")
-load.Rdata("2024-06-28__2020_leagues_friendlies", "df1")
-load.Rdata("2024-06-27__2021_leagues_friendlies", "df2")
-load.Rdata("2024-06-27__2022_leagues_friendlies", "df3")
-load.Rdata("2024-06-27__2023_leagues_friendlies", "df4")
-load.Rdata("2024-06-27__2024_leagues_friendlies", "df5")
-#(new)
-load.Rdata("2024-07-05__2019_leagues_friendlies", "df6")
-load.Rdata("2024-07-05__2018_leagues_friendlies", "df7")
-load.Rdata("2024-07-05__2017_leagues_friendlies", "df8")
-#
-load.Rdata("2024-07-04__2022_1", "df9")
-load.Rdata("2024-07-05__2018_1", "df10")
-load.Rdata("2024-07-04__2020_5", "df11")
-load.Rdata("2024-07-04__2022_5", "df12")
-load.Rdata("2024-07-04__2024_5", "df13")
-load.Rdata("2024-07-04__2020_4", "df14")
-load.Rdata("2024-07-04__2024_4", "df15")
-load.Rdata("2024-07-04__2023_960", "df16")
-#(new)
-load.Rdata("2024-07-05__2023_22", "df17")
-load.Rdata("2024-07-05__2021_22", "df18")
-load.Rdata("2024-07-05__2019_22", "df19")
-load.Rdata("2024-07-05__2017_22", "df20")
-load.Rdata("2024-07-05__2015_22", "df21")
-#(new)
-load.Rdata("2024-07-05__2018_29", "df22")
-load.Rdata("2024-07-05__2022_29", "df23")
-load.Rdata("2024-07-05__2023_29", "df24")
-#(new)
-load.Rdata("2024-07-05__2022_30", "df25")
-load.Rdata("2024-07-05__2018_30", "df26")
-#(new)
-load.Rdata("2024-07-05__2022_31", "df27")
-load.Rdata("2024-07-05__2018_31", "df28")
-#(new)
-load.Rdata("2024-07-05__2020_32", "df29")
-load.Rdata("2024-07-05__2018_32", "df30")
-#(new)
-load.Rdata("2024-07-05__2022_34", "df31")
-load.Rdata("2024-07-05__2018_34", "df32")
-#(new)
-load.Rdata("2024-07-05__2022_35", "df33")
-load.Rdata("2024-07-05__2019_35", "df34")
-# (new)
-load.Rdata("2024-07-05__2022_37", "df35")
-load.Rdata("2024-07-05__2018_37", "df36")
-load.Rdata("2024-07-05__2014_37", "df37")
-# (new)
-# load.Rdata("2024-07-05__2023_38", "df38")
-# load.Rdata("2024-07-05__2021_38", "df39")
-# load.Rdata("2024-07-05__2017_38", "df40")
-df_list <- mget(paste0("df", 1:37))
-# Combine the different years together from the raw datasets
-# fixtures_training <- bind_rows(fixtures_training_2020, fixtures_training_2021, fixtures_training_2022, 
-#                                fixtures_training_2023, fixtures_training_2024) %>% 
-fixtures_training <- bind_rows(df_list)
 
+
+fixtures_training <- bind_rows(df_list)
 # convert some to numeric for better handling
 fixtures_training <- fixtures_training %>% 
   mutate(across(any_of(post_game_varnames), as.numeric))
 
-# FEATURE ENGINEERING
-#Functions
-
 fixtures_training <- fixtures_training %>% arrange(desc(fixture.date))
+fixtures_training <- fixtures_training %>% 
+  mutate(fixture.date = as.Date(fixture.date)) %>% 
+  mutate(teams.home.name = case_when(
+    teams.home.name == "Korea Republic" ~ "South Korea",
+    TRUE ~ teams.home.name  # keep other country names unchanged
+  )) %>% 
+  mutate(teams.away.name = case_when(
+    teams.away.name == "Korea Republic" ~ "South Korea",
+    TRUE ~ teams.away.name  # keep other country names unchanged
+  ))
 
-avg_df <- calculate_averages(fixtures_training, post_game_varnames, 
+# Step 2: Join for home teams
+home_join <- fixtures_training %>%
+  left_join(fifa_rank, by = c("teams.home.name" = "country_full")) %>%
+  filter(rank_date <= fixture.date) %>%
+  group_by(teams.home.name, fixture.date) %>%
+  filter(rank_date == max(rank_date)) %>%
+  rename(
+    confederation.home = confederation , 
+    rank.date.home = rank_date, 
+    rank.home = rank, 
+    total.points.home = total_points,
+    previous.points.home = previous_points,
+    rank.change.home = rank_change
+  ) %>%
+  ungroup()
+
+# Step 3: Join for away teams
+away_join <- fixtures_training %>%
+  left_join(fifa_rank, by = c("teams.away.name" = "country_full")) %>%
+  filter(rank_date <= fixture.date) %>%
+  group_by(teams.away.name, fixture.date) %>%
+  filter(rank_date == max(rank_date)) %>%
+  rename(
+    confederation.away = confederation, 
+    rank.date.away = rank_date, 
+    rank.away = rank, 
+    total.points.away = total_points,
+    previous.points.away = previous_points,
+    rank.change.away = rank_change) %>% 
+  ungroup()
+
+# Step 4: Combine the results
+final_data <- home_join %>%
+  left_join(select(away_join, teams.away.name, confederation.away, 
+                   rank.date.away, rank.away, 
+                   total.points.away, previous.points.away, rank.change.away,
+                   fixture.date, fixture.id), 
+            by = c("teams.away.name", "fixture.date", "fixture.id"))
+final_data <- final_data %>% as_tibble()
+final_data <- final_data %>% 
+  mutate(across(any_of(post_game_varnames), as.numeric))
+final_data <- final_data %>% arrange(desc(fixture.date))
+
+avg_df <- calculate_averages(final_data, post_game_varnames, 
                              fixture_lookback = 20,
                              weighting = "soft")
 
-avg_df <- as.data.frame(lapply(avg_df, function(x) sapply(x, unlist)))
 
-fixtures_training <- calculate_time_diff(fixtures_training)
+final_data <- calculate_time_diff(final_data)
 # games_played_recent <- 
-namefile <- paste0(Sys.Date(), "__", "avg_df_9thjul")
-save(avg_df, file = namefile)
+namefile <- paste0(Sys.Date(), "__", "avg_df_10thjul")
+save(final_data, file = namefile)
 # load(namefile)
 # setting the output variable
-target_variable <- ifelse(is.na(fixtures_training$teams.home.winner), "draw",
-                          ifelse(fixtures_training$teams.home.winner == 1, "home",
-                                 ifelse(fixtures_training$teams.home.winner == 0, "away", NA)))
-fixtures_training$outcome <- target_variable
-fixtures_training$outcome <- as.factor(target_variable)
+target_variable <- ifelse(is.na(final_data$teams.home.winner), "draw",
+                          ifelse(final_data$teams.home.winner == 1, "home",
+                                 ifelse(final_data$teams.home.winner == 0, "away", NA)))
+final_data$outcome <- target_variable
+final_data$outcome <- as.factor(target_variable)
 # de-select forward-looking bias variables, and add aggregated post_games
-fixtures_training <- fixtures_training[!duplicated(fixtures_training),]
+final_data <- final_data[!duplicated(final_data),]
 avg_df <- avg_df[!duplicated(avg_df$fixture.id),]
 full_set <- left_join(
-  fixtures_training[, !names(fixtures_training) %in% post_game_varnames], avg_df,
+  final_data[, !names(final_data) %in% post_game_varnames], avg_df,
                       by = "fixture.id") %>% 
   select(-any_of(redundant_vars)) %>% 
   suppressMessages()
 
 
-
 # CLEANING
+
 # Filter for missing values and correct match status
 # remove full NaN column
 clean_set <- full_set[, colSums(is.na(full_set)) < nrow(full_set)]
@@ -151,17 +146,36 @@ clean_set <- clean_set[rowSums(is.na(clean_set)) <= 164, ]
 # impute the missing averages with a median
 clean_set <- clean_set %>% 
   mutate(across(where(is.numeric), ~replace_na(., median(., na.rm=TRUE))))
+clean_set <- clean_set %>% 
+  mutate(rank.date.home = if_else(is.na(rank.date.home), fixture.date, rank.date.home)) %>% 
+  mutate(rank.date.away = if_else(is.na(rank.date.away), fixture.date, rank.date.away))
 
 character_cols <- sapply(clean_set, is.character)
 clean_set[, character_cols][is.na(clean_set[, character_cols])] <- "no-value"
 clean_set[is.na(clean_set)] <- -1
 # only want finished games included - forward-looking variable
 # 
-target_games <- clean_set[clean_set$fixture.id %in% c(1219688, 1219959, 1219689, 1220308) ,]
+target_games <- clean_set[clean_set$fixture.id %in% c(1227539, 1225853) ,]
 target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.elapsed))
 
 clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
 clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed))
+# clean_set <- clean_set[c(1:17, 148:212)]
+
+# REGRESSION TREE
+# train_set_balanced <- upSample(x = train_set[, -which(names(train_set) == "outcome")], 
+#                                y = train_set$outcome)
+# train_set_balanced <- bind_cols(train_set_balanced, outcome = train_set_balanced$Class)
+# train_set_balanced$Class <- NULL
+
+split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
+train_set <- training(split_set)
+test_set <- testing(split_set)
+
+x_vars <- train_set %>%
+  select(-outcome)
+y_var <- train_set %>%
+  select(outcome)
 
 # Calculate class frequencies
 class_counts <- table(train_set$outcome)
@@ -171,29 +185,15 @@ class_weights <- total_samples / (length(class_counts) * class_counts)
 # Assign weights to each instance in the training set
 instance_weights <- sapply(train_set$outcome, function(x) class_weights[x])
 
-# REGRESSION TREE
-save.image(file = paste0(Sys.Date(),"ready_for_execution_5_eve.RData"))
+# save.image(file = paste0(Sys.Date(),"ready_for_execution_10_eve.RData"))
 # load("2024-06-30ready_for_execution.RData")
 forest_spec <- rand_forest(trees = 10000, 
                            min_n = 1, 
                            mtry = round(sqrt(ncol(clean_set))), 
                            mode = "classification") %>% 
   set_engine("ranger", importance = "impurity", case.weights = instance_weights)
-             # 
-split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
-train_set <- training(split_set)
-test_set <- testing(split_set)
+# 
 
-# train_set_balanced <- upSample(x = train_set[, -which(names(train_set) == "outcome")], 
-#                                y = train_set$outcome)
-# train_set_balanced <- bind_cols(train_set_balanced, outcome = train_set_balanced$Class)
-# train_set_balanced$Class <- NULL
-
-
-x_vars <- train_set %>%
-  select(-outcome)
-y_var <- train_set %>%
-  select(outcome)
 
 # x_vars <- train_set_balanced %>%
 #   select(-outcome)
@@ -219,3 +219,50 @@ tree_model <- extract_fit_engine(model)
 vip(tree_model, num_features = ncol(clean_set)-1)
 
 
+
+
+
+
+
+
+
+
+
+# BOOSTED TREES model
+rec <- recipe(outcome ~ . , data = train_set) %>% 
+  step_zv () %>% 
+  step_normalize(all_numeric(), -all_outcomes()) %>% 
+  step_dummy(all_nominal(), -all_outcomes())
+processed_training_data <- prep(rec) %>% juice()
+processed_testing_data <- bake(prep(rec), new_data = test_set)
+
+
+xgb_spec <- boost_tree(
+  trees = 10000,  # Number of trees
+  min_n = 1,  # Minimum number of data points in a node
+  # tree_depth = 6,  # Depth of the tree
+  # learn_rate = 0.01,  # Learning rate
+  # loss_reduction = 0.01,  # Minimum loss reduction required for further partitioning
+  # sample_size = 1,  # Fraction of observations to sample
+  mtry = round(sqrt(ncol(clean_set))),  # Number of variables available for splitting at each tree node
+  mode = "classification"  # Classification mode
+) %>% 
+  set_engine("xgboost", importance = "gain", case.weights = instance_weights)
+
+x_vars <- processed_training_data %>%
+  select(-outcome)
+y_var <- processed_training_data %>%
+  select(outcome)
+
+model <- xgb_spec %>% 
+  fit_xy(x = x_vars , y = y_var, data = processed_training_data)
+
+predictions <- predict(model, new_data = processed_testing_data %>% select(-outcome))
+
+# Create confusion matrix
+cm <- confusionMatrix(predictions$.pred_class, processed_testing_data$outcome)
+sum(cm$byClass[,"F1"] * cm$byClass[,"Prevalence"])
+
+# INTERPRET
+tree_model <- extract_fit_engine(model)
+vip(tree_model, num_features = ncol(clean_set)-1)
