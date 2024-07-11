@@ -38,16 +38,7 @@ teams_repo = new("Teams_Repository")
 teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
 
 
-teams_euro2024 <- c("Germany", "Scotland", "Hungary", "Switzerland", "Spain", 
-                    "Croatia", "Italy", "Albania", "Slovenia", "Denmark", 
-                    "Serbia", "England", "Poland", "Netherlands", "Austria",
-                    "France", "Belgium", "Slovakia", "Romania", "Ukraine",
-                    "Turkey", "Georgia", "Portugal", "Czech Republic")
-
-
-
-
-
+# DATA PRE-PROCESSING
 fixtures_training <- bind_rows(df_list)
 # convert some to numeric for better handling
 fixtures_training <- fixtures_training %>% 
@@ -64,6 +55,27 @@ fixtures_training <- fixtures_training %>%
     teams.away.name == "Korea Republic" ~ "South Korea",
     TRUE ~ teams.away.name  # keep other country names unchanged
   ))
+fixtures_training <- fixtures_training %>%
+  mutate(draw_status = if_else(
+    league.round %in% c("Final", "Finals", "3rd Place Final", "Semi-finals", "Quarter-finals", "8th Finals") &
+      league.name %in% c("UEFA Nations League", "Euro Championship", "CONCACAF Gold Cup", "World Cup", "Africa Cup of Nations", "Asian Cup", "Copa America"),
+    "cannot.draw",
+    "can.draw"
+  ))
+fixtures_training <- fixtures_training %>%
+  stringdist_left_join(world.cities, by = c("fixture.venue.city" = "name"), 
+                       method = "jw", max_dist = 0.1, distance_col = "dist",
+                       ignore_case = FALSE) %>%
+  group_by(fixture.venue.city, fixture.id) %>%
+  slice_min(dist, with_ties = FALSE) %>%  # Keep only the match with the smallest distance
+  ungroup() %>%
+  rename(country = country.etc) %>%
+  select(-dist) %>%   # Remove the distance column 
+  select(-c(pop, lat, long, capital))
+fixtures_training <- fixtures_training %>%
+  mutate(country.home.advantage = if_else(is.na(country) | is.na(teams.home.name), 0.5, 
+                                          if_else(country == teams.home.name, 1, 0)))
+
 
 # Step 2: Join for home teams
 home_join <- fixtures_training %>%
@@ -115,8 +127,8 @@ avg_df <- calculate_averages(final_data, post_game_varnames,
 
 final_data <- calculate_time_diff(final_data)
 # games_played_recent <- 
-namefile <- paste0(Sys.Date(), "__", "avg_df_10thjul")
-save(final_data, file = namefile)
+# namefile <- paste0(Sys.Date(), "__", "avg_df_10thjul")
+# save(final_data, file = namefile)
 # load(namefile)
 # setting the output variable
 target_variable <- ifelse(is.na(final_data$teams.home.winner), "draw",

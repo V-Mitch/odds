@@ -194,13 +194,16 @@ calculate_averages <- function(fixture_dataframe,
       avgs_for_away_team <- df %>% add_row()
     }
     
+    corenames <- colnames(avgs_for_home_team)
+    colnames(avgs_for_home_team) <- paste0("home.",colnames(corenames))
+    colnames(avgs_for_away_team) <- paste0("away",colnames(corenames))                                       
     current_teams_differences <- avgs_for_home_team - avgs_for_away_team
     colnames(current_teams_differences) <- paste0("crtteams.diff.", 
-                                                   colnames(current_teams_differences))
+                                                  corenames)
     
     df_averages[[i]] <- c(avgs_for_home_team, avgs_for_away_team, current_teams_differences, current_fixture$fixture.id)
     print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
-    browser()
+    
   }
 
   
