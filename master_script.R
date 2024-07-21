@@ -38,7 +38,7 @@ teams_repo = new("Teams_Repository")
 teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
 
 
-# DATA PRE-PROCESSING
+# DATA PRE-PROCESSING COMBINING AND COMPLETING
 fixtures_training <- bind_rows(df_list)
 # convert some to numeric for better handling
 fixtures_training <- fixtures_training %>% 
@@ -63,18 +63,19 @@ fixtures_training <- fixtures_training %>%
     "can.draw"
   ))
 fixtures_training <- fixtures_training %>%
+  mutate(fixture.venue.city = sub(", .*", "", fixture.venue.city)) %>% 
   stringdist_left_join(world.cities, by = c("fixture.venue.city" = "name"), 
-                       method = "jw", max_dist = 0.1, distance_col = "dist",
+                       method = "jw", max_dist = 0.2, distance_col = "dist",
                        ignore_case = FALSE) %>%
   group_by(fixture.venue.city, fixture.id) %>%
   slice_min(dist, with_ties = FALSE) %>%  # Keep only the match with the smallest distance
   ungroup() %>%
   rename(country = country.etc) %>%
-  select(-dist) %>%   # Remove the distance column 
-  select(-c(pop, lat, long, capital))
+  select(-c(pop, lat, long, capital, dist))
 fixtures_training <- fixtures_training %>%
-  mutate(country.home.advantage = if_else(is.na(country) | is.na(teams.home.name), 0.5, 
-                                          if_else(country == teams.home.name, 1, 0)))
+  mutate(country.home.advantage = if_else(
+    is.na(country) | is.na(teams.home.name), 0.5,
+    if_else(stringdist::stringdist(country, teams.home.name, method = "jw") <= 0.15, 1, 0)))
 
 
 # Step 2: Join for home teams
@@ -124,9 +125,7 @@ avg_df <- calculate_averages(final_data, post_game_varnames,
                              fixture_lookback = 20,
                              weighting = "soft")
 
-
 final_data <- calculate_time_diff(final_data)
-# games_played_recent <- 
 # namefile <- paste0(Sys.Date(), "__", "avg_df_10thjul")
 # save(final_data, file = namefile)
 # load(namefile)
@@ -145,33 +144,74 @@ full_set <- left_join(
   select(-any_of(redundant_vars)) %>% 
   suppressMessages()
 
-
 # CLEANING
-
 # Filter for missing values and correct match status
-# remove full NaN column
+# remove full NaN columns
 clean_set <- full_set[, colSums(is.na(full_set)) < nrow(full_set)]
 # remove dirty rows with very little data
 clean_set <- clean_set[rowSums(is.na(clean_set)) <= 164, ]
-# clean_set %>%
-#   summarise(across(everything(), ~ sum(is.na(.))))
-# impute the missing averages with a median
-clean_set <- clean_set %>% 
-  mutate(across(where(is.numeric), ~replace_na(., median(., na.rm=TRUE))))
+clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
+clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed))
+character_cols <- sapply(clean_set, is.character)
+clean_set[, character_cols][is.na(clean_set[, character_cols])] <- "no-value"
+# clean_set[is.na(clean_set)] <- -1
 clean_set <- clean_set %>% 
   mutate(rank.date.home = if_else(is.na(rank.date.home), fixture.date, rank.date.home)) %>% 
   mutate(rank.date.away = if_else(is.na(rank.date.away), fixture.date, rank.date.away))
+names(clean_set) <- make.names(names(clean_set))
 
-character_cols <- sapply(clean_set, is.character)
-clean_set[, character_cols][is.na(clean_set[, character_cols])] <- "no-value"
-clean_set[is.na(clean_set)] <- -1
+# SPLIT DATASET TO AVOID DATA-LEAKAGE IN FURTHER TREATMENTS
+split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
+# train_set <- training(split_set)
+# test_set <- testing(split_set)
+
+
+# clean_set <- clean_set[rowSums(is.na(clean_set)) <= 200, ]
+# cor_matrix <- clean_set %>% select(where(is.numeric)) %>% 
+#   select_if(~ var(.,na.rm=TRUE) != 0) %>% 
+#   cor(use= "pairwise.complete.obs")
+# na_columns <- which(apply(cor_matrix, 2, anyNA))
+# cor_matrix <- cor_matrix[-na_columns, -na_columns]
+# high_cor_pairs <- findCorrelation(cor_matrix, cutoff = 0.9)
+# high_cor_names <- colnames(cor_matrix[high_cor_pairs,high_cor_pairs])
+# imputable_set <- clean_set %>% 
+  # select(where(is.numeric))
+method_imp <- ifelse(sapply(split_set$data, is.numeric), "rf", "")
+
+imputed_model <- mice(split_set$data, method = method_imp, m = 2, maxit = 1
+                      , ignore = !(row.names(split_set$data) %in% split_set$in_id))
+# imputed_model$ignore <- NULL
+imputes_multiple <- complete(imputed_model, action = "long")
+# split_set$data <- complete(imputed_model, action = "long")
+summarized_imputes <- imputes_multiple %>%
+  group_by(.id) %>%
+  summarise(across(everything(), mean(na.rm = TRUE))) %>% 
+  select(-c(.id, -imp))
+split_set$data <- summarized_imputes
+
+train_set <- training(split_set)
+test_set <- testing(split_set)
+
+medians_rem <- preProcess(train_set, method = "medianImpute")
+train_set <- predict(medians_rem, train_set)
+test_set <- predict(medians_rem, test_set)
+
+# clean_set %>%
+#   summarise(across(everything(), ~ sum(is.na(.))))
+# impute the missing averages with a median
+# clean_set <- clean_set %>% 
+#   mutate(across(where(is.numeric), ~replace_na(., median(., na.rm=TRUE))))
+# clean_set <- clean_set %>% 
+  
+
+
+
 # only want finished games included - forward-looking variable
 # 
 target_games <- clean_set[clean_set$fixture.id %in% c(1227539, 1225853) ,]
 target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.elapsed))
 
-clean_set <- clean_set[clean_set$fixture.status.long == "Match Finished",]
-clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed))
+
 # clean_set <- clean_set[c(1:17, 148:212)]
 
 # REGRESSION TREE
@@ -180,9 +220,9 @@ clean_set <- clean_set %>% select(-c(fixture.status.long, fixture.status.elapsed
 # train_set_balanced <- bind_cols(train_set_balanced, outcome = train_set_balanced$Class)
 # train_set_balanced$Class <- NULL
 
-split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
-train_set <- training(split_set)
-test_set <- testing(split_set)
+# split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
+# train_set <- training(split_set)
+# test_set <- testing(split_set)
 
 x_vars <- train_set %>%
   select(-outcome)
@@ -228,7 +268,7 @@ sum(cm$byClass[,"F1"] * cm$byClass[,"Prevalence"])
 
 # INTERPRET
 tree_model <- extract_fit_engine(model)
-vip(tree_model, num_features = ncol(clean_set)-1)
+vipdat <- vip(tree_model, num_features = ncol(clean_set)-1)
 
 
 

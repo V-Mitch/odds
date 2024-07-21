@@ -222,3 +222,65 @@ get_past_matches <- function(leagues, seasons, api_key, api_host, teams = c(), s
 # } else {
 #   full_book <- stack_player_data(parsed_data)
 # }
+
+get_past_players <- function(leagues, seasons, api_key, api_host, teams = c(), short_limit = 300){
+  
+  url <- paste(infinitif,"/fixtures/?league=",leagues,"&season=",seasons,"", sep = "")
+  res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                               'x-rapidapi-host' = api_host))
+  str_res_json <- rawToChar(res$content)
+  parsed_fixtures <- fromJSON(str_res_json)
+  tib_df <- flatten_to_df(parsed_fixtures$response)
+  
+  if (!is.null(teams)){
+    tib_df <- tib_df %>% filter(teams.away.name %in% teams | teams.home.name %in% teams)
+  }
+  
+  fixture_df <- data.frame(matrix(ncol = 0, nrow = 1))
+  
+  time_loop_start <- Sys.time()
+  
+  # for (i in 1:nrow(tib_df)){
+  for (i in 1:10){
+    
+    url <- paste(infinitif,"/fixtures/lineups/?fixture=",tib_df[i,"fixture.id"], sep = "")
+    res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+                                 'x-rapidapi-host' = api_host))
+    str_res_json <- rawToChar(res$content)
+    parsed_lineups <- fromJSON(str_res_json)
+    if (length(parsed_lineups$response) !=0){
+      lineup_df <- flatten_to_df_lineup(parsed_lineups$response)
+    } else{
+      lineup_df <- data.frame(matrix(ncol = 0, nrow = 1))
+    }
+    
+    
+    # url <- paste(infinitif,"/fixtures/statistics/?fixture=",tib_df[i,"fixture.id"], sep = "")
+    # res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
+    #                              'x-rapidapi-host' = api_host))
+    # str_res_json <- rawToChar(res$content)
+    # parsed_stats <- fromJSON(str_res_json)
+    # if (length(parsed_stats$response) !=0){
+    #   stats_df <- flatten_fixture_stats(parsed_stats$response) %>% select(-logo, -id) %>% t() 
+    #   colnames(stats_df) <- paste(stats_df['name',],stats_df['type',], sep = ".")
+    #   stats_df <- t(stats_df[!rownames(stats_df) %in% c("name", "type"),])
+    # } else {
+    #   stats_df <- data.frame(matrix(ncol = 0, nrow = 1))
+    # }
+    
+    # final_fixture_row <- cbind(tib_df[i,], lineup_df, stats_df)
+    final_fixture_row <- cbind(tib_df[i,], lineup_df)
+    fixture_df <- bind_rows(final_fixture_row, fixture_df) %>% 
+      suppressMessages()
+    print(paste0("Fixture ", i ," added to the fixture dataframe. ",res$headers$`x-ratelimit-requests-remaining` ,
+                 "/", res$headers$`x-ratelimit-requests-limit`,
+                 " tokens remaining from API-Odds. Dimensions of current dataframe: ", 
+                 paste0(dim(fixture_df)[1], " rows, ",dim(fixture_df)[2])," columns."))
+    if (i %% short_limit/2 == 0 & Sys.time() - time_loop_start < 60){
+      time_loop_start <- Sys.time()
+      print(paste0("pausing for ", 60 - (Sys.time() - time_loop_start) + 1, " seconds"))
+      Sys.sleep(60 - (Sys.time() - time_loop_start) + 1)
+    }
+  }
+  return(fixture_df)
+}
