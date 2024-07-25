@@ -25,7 +25,7 @@ IV. Model Evaluation
   1. Re-Evaluate all of the above through observations/results 🕒  
   2. Find metrics / visuals to better evaluate the results ✅
   
-V. Model Deployment/Serviong/Monnitoring/Maintenance  
+V. Model Deployment/Serving/Monnitoring/Maintenance  
   out-of-scope  
     
 
