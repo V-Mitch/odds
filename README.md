@@ -36,8 +36,9 @@ Weakness: Predicting draws is very difficult, as explained in the literature. Cu
   
 Example of some predictions vs. Online Odds data in quarter-finals of the UEFA EURO 2024:  
 ML predictions taken the morning before the first quarter-final games were played (france-portugal and germany-spain)  
+  
 +---------------------+-------+-------+-------+  
-|                     | t1     | draw    | t2 |  
+|$~~~~~~~~~~~~~~~~~~~$| t1     | draw    | t2 |  
 +---------------------+-------+-------+-------+  
 | germany-spain       | 0.249  | 0.308| 0.443 |  
 +---------------------+-------+-------+-------+  
