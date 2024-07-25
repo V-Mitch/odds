@@ -37,5 +37,8 @@ Weakness: Predicting draws is very difficult, as explained in the literature. Cu
 Example of some %percentage predictions vs. Online implied percentages from odds data in quarter-finals of the UEFA EURO 2024:  
   
 ![image](https://github.com/user-attachments/assets/b297bd9e-b684-462c-adc6-71bb61d1c300)
-
-
+  
+Ranking of most important features so far:  
+  
+![image](https://github.com/user-attachments/assets/39a00f76-78b6-42ef-b164-3d1c205256d2)
+  
