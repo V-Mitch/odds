@@ -1,4 +1,4 @@
-2024 Project 
+**Appllied Machine Learning 2024 Project**  
 Goal: 
 
 Steps:  
