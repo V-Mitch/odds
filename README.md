@@ -22,8 +22,9 @@ III. Model training
   2. Establish train/test procedure ✅
   
 IV. Model Evaluation  
-  1. Re-Evaluate all of the above through observations/results 🕒  
-  2. Find metrics / visuals to better evaluate the results ✅
+  1. Re-Evaluate all of the above through observations/results 🕒
+  2. Run Boruta (or similar) algorithm to find important features 🕒 
+  3. Find metrics / visuals to better evaluate the results ✅
   
 V. Model Deployment/Serving/Monnitoring/Maintenance  
   out-of-scope  
