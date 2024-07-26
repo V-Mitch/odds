@@ -1,5 +1,4 @@
 **Applied Machine Learning 2024 Project**  
-Goal: 
 
 Steps:  
 I. GOAL DEFINITION  
