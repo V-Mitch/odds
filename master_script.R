@@ -16,26 +16,29 @@ library(reshape2)
 library(vip)
 library(pdp)
 library(miceadds)
+library(fuzzyjoin)
+library(parsnip)
+library(rsample)
 
-sports_repo = new("Sports_Repository")
-sports_repo = updateSportsFromAPI(sports_repo, all = "false")
-sports_repo@data$title
-
-events_repo = new("Events_Repository")
-events_repo = updateEventsFromAPI(events_repo, 
-                                  sport = "soccer_uefa_european_championship")
-
-
-odds_repo = new("Odds_Repository")
-odds_repo = updateOddsFromAPI(odds_repo, 
-                              sport = "soccer_uefa_european_championship", 
-                              market = "h2h", regions = "uk,eu")
-
-odds_table = extract_over_row(odds_repo@data)
-odds_table[odds_table["key"] == "betfair_ex_eu",]
-
-teams_repo = new("Teams_Repository")
-teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
+# sports_repo = new("Sports_Repository")
+# sports_repo = updateSportsFromAPI(sports_repo, all = "false")
+# sports_repo@data$title
+# 
+# events_repo = new("Events_Repository")
+# events_repo = updateEventsFromAPI(events_repo, 
+#                                   sport = "soccer_uefa_european_championship")
+# 
+# 
+# odds_repo = new("Odds_Repository")
+# odds_repo = updateOddsFromAPI(odds_repo, 
+#                               sport = "soccer_uefa_european_championship", 
+#                               market = "h2h", regions = "uk,eu")
+# 
+# odds_table = extract_over_row(odds_repo@data)
+# odds_table[odds_table["key"] == "betfair_ex_eu",]
+# 
+# teams_repo = new("Teams_Repository")
+# teams_repo = updateTeamsFromAPI(teams_repo, competition = "EC")
 
 
 # DATA PRE-PROCESSING COMBINING AND COMPLETING
@@ -176,18 +179,18 @@ split_set <- initial_split(clean_set, prop = 0.75, strata = outcome)
 # high_cor_names <- colnames(cor_matrix[high_cor_pairs,high_cor_pairs])
 # imputable_set <- clean_set %>% 
   # select(where(is.numeric))
-method_imp <- ifelse(sapply(split_set$data, is.numeric), "rf", "")
-
-imputed_model <- mice(split_set$data, method = method_imp, m = 2, maxit = 1
-                      , ignore = !(row.names(split_set$data) %in% split_set$in_id))
-# imputed_model$ignore <- NULL
-imputes_multiple <- complete(imputed_model, action = "long")
-# split_set$data <- complete(imputed_model, action = "long")
-summarized_imputes <- imputes_multiple %>%
-  group_by(.id) %>%
-  summarise(across(everything(), mean(na.rm = TRUE))) %>% 
-  select(-c(.id, -imp))
-split_set$data <- summarized_imputes
+# method_imp <- ifelse(sapply(split_set$data, is.numeric), "rf", "")
+# 
+# imputed_model <- mice(split_set$data, method = method_imp, m = 2, maxit = 1
+#                       , ignore = !(row.names(split_set$data) %in% split_set$in_id))
+# # imputed_model$ignore <- NULL
+# imputes_multiple <- complete(imputed_model, action = "long")
+# # split_set$data <- complete(imputed_model, action = "long")
+# summarized_imputes <- imputes_multiple %>%
+#   group_by(.id) %>%
+#   summarise(across(everything(), mean(na.rm = TRUE))) %>% 
+#   select(-c(.id, -imp))
+# split_set$data <- summarized_imputes
 
 train_set <- training(split_set)
 test_set <- testing(split_set)
@@ -208,8 +211,8 @@ test_set <- predict(medians_rem, test_set)
 
 # only want finished games included - forward-looking variable
 # 
-target_games <- clean_set[clean_set$fixture.id %in% c(1227539, 1225853) ,]
-target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.elapsed))
+# target_games <- clean_set[clean_set$fixture.id %in% c(1227539, 1225853) ,]
+# target_games <- target_games %>% select(-c(fixture.status.long, fixture.status.elapsed))
 
 
 # clean_set <- clean_set[c(1:17, 148:212)]
@@ -258,8 +261,8 @@ model <- forest_spec %>%
 predictions_prob <- predict(model, new_data = test_set, type = "prob")
 predictions <- predict(model, new_data = test_set)
 
-predictions_recent_prob <- predict(model, new_data = target_games, type = "prob")
-predictions_recent <- predict(model, new_data = target_games)
+# predictions_recent_prob <- predict(model, new_data = target_games, type = "prob")
+# predictions_recent <- predict(model, new_data = target_games)
 
 # Create confusion matrix
 cm <- confusionMatrix(predictions$.pred_class, test_set$outcome)
@@ -281,40 +284,40 @@ vipdat <- vip(tree_model, num_features = ncol(clean_set)-1)
 
 
 # BOOSTED TREES model
-rec <- recipe(outcome ~ . , data = train_set) %>% 
-  step_zv () %>% 
-  step_normalize(all_numeric(), -all_outcomes()) %>% 
-  step_dummy(all_nominal(), -all_outcomes())
-processed_training_data <- prep(rec) %>% juice()
-processed_testing_data <- bake(prep(rec), new_data = test_set)
-
-
-xgb_spec <- boost_tree(
-  trees = 10000,  # Number of trees
-  min_n = 1,  # Minimum number of data points in a node
-  # tree_depth = 6,  # Depth of the tree
-  # learn_rate = 0.01,  # Learning rate
-  # loss_reduction = 0.01,  # Minimum loss reduction required for further partitioning
-  # sample_size = 1,  # Fraction of observations to sample
-  mtry = round(sqrt(ncol(clean_set))),  # Number of variables available for splitting at each tree node
-  mode = "classification"  # Classification mode
-) %>% 
-  set_engine("xgboost", importance = "gain", case.weights = instance_weights)
-
-x_vars <- processed_training_data %>%
-  select(-outcome)
-y_var <- processed_training_data %>%
-  select(outcome)
-
-model <- xgb_spec %>% 
-  fit_xy(x = x_vars , y = y_var, data = processed_training_data)
-
-predictions <- predict(model, new_data = processed_testing_data %>% select(-outcome))
-
-# Create confusion matrix
-cm <- confusionMatrix(predictions$.pred_class, processed_testing_data$outcome)
-sum(cm$byClass[,"F1"] * cm$byClass[,"Prevalence"])
-
-# INTERPRET
-tree_model <- extract_fit_engine(model)
-vip(tree_model, num_features = ncol(clean_set)-1)
+# rec <- recipe(outcome ~ . , data = train_set) %>% 
+#   step_zv () %>% 
+#   step_normalize(all_numeric(), -all_outcomes()) %>% 
+#   step_dummy(all_nominal(), -all_outcomes())
+# processed_training_data <- prep(rec) %>% juice()
+# processed_testing_data <- bake(prep(rec), new_data = test_set)
+# 
+# 
+# xgb_spec <- boost_tree(
+#   trees = 10000,  # Number of trees
+#   min_n = 1,  # Minimum number of data points in a node
+#   # tree_depth = 6,  # Depth of the tree
+#   # learn_rate = 0.01,  # Learning rate
+#   # loss_reduction = 0.01,  # Minimum loss reduction required for further partitioning
+#   # sample_size = 1,  # Fraction of observations to sample
+#   mtry = round(sqrt(ncol(clean_set))),  # Number of variables available for splitting at each tree node
+#   mode = "classification"  # Classification mode
+# ) %>% 
+#   set_engine("xgboost", importance = "gain", case.weights = instance_weights)
+# 
+# x_vars <- processed_training_data %>%
+#   select(-outcome)
+# y_var <- processed_training_data %>%
+#   select(outcome)
+# 
+# model <- xgb_spec %>% 
+#   fit_xy(x = x_vars , y = y_var, data = processed_training_data)
+# 
+# predictions <- predict(model, new_data = processed_testing_data %>% select(-outcome))
+# 
+# # Create confusion matrix
+# cm <- confusionMatrix(predictions$.pred_class, processed_testing_data$outcome)
+# sum(cm$byClass[,"F1"] * cm$byClass[,"Prevalence"])
+# 
+# # INTERPRET
+# tree_model <- extract_fit_engine(model)
+# vip(tree_model, num_features = ncol(clean_set)-1)
