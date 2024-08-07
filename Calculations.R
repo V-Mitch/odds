@@ -70,11 +70,10 @@ calculate_averages <- function(fixture_dataframe,
                                             length.out = fixture_lookback)),
                     "soft" = exp(seq(-1, -fixture_lookback, 
                                      length.out = fixture_lookback))^0.25 /
-                    sum(exp(seq(-1, -fixture_lookback, 
+                      sum(exp(seq(-1, -fixture_lookback, 
                                   length.out = fixture_lookback))^0.25)
-                    )
+  )
   # Which variables should have the difference taken?
-  
   comparison_vars_t1 <- post_game_varnames[grepl("team\\.1\\.|team\\.2\\.", post_game_varnames)]
   comparison_vars_t3 <- post_game_varnames[grepl("teams", post_game_varnames)]
   comparison_vars_t2 <- post_game_varnames[!post_game_varnames %in% 
@@ -134,7 +133,7 @@ calculate_averages <- function(fixture_dataframe,
       filter(teams.home.name == as.character(away_team))
     away_prior_5 <- bind_rows(away_prior_as_home, away_prior_as_away) %>% 
       arrange(desc(fixture.date))
-
+    
     # in case of empty past 5 matches, ensure theres a NaN placeholder
     if(nrow(home_prior_5) == 0){
       home_prior_5 <- home_prior_5 %>% add_row() %>% 
@@ -204,10 +203,10 @@ calculate_averages <- function(fixture_dataframe,
     print(paste0("Calculated averages for fixture ",i,"/",nrow(fixture_dataframe)))
     
   }
-
+  
   
   df_averages <- do.call(rbind, df_averages)
-
+  
   rownames(df_averages) <- NULL
   df_averages <- as.data.frame(lapply(as.data.frame(df_averages), function(x) sapply(x, unlist)))
   colnames(df_averages) <- c(paste0(colnames(avgs_for_home_team)),
@@ -238,3 +237,128 @@ calculate_time_diff <- function(fixture_dataframe){
 }
 
 
+calculate_player_homogeneity <- function(fixture_dataframe, 
+                                         post_game_varnames, 
+                                         fixture_lookback = 5,
+                                         weighting = "normal"){
+  
+  # arrange by date chronologically youngest to oldest game
+  fixture_dataframe <- fixture_dataframe %>%
+    arrange(desc(fixture.date))
+  df_scores <- list()
+  
+  weights <- switch(weighting,
+                    "normal" = rep(1, length.out = fixture_lookback),
+                    "linear" = seq(1, 0, length.out = fixture_lookback),
+                    "exponential" = exp(seq(-1, -fixture_lookback, 
+                                            length.out = fixture_lookback)),
+                    "soft" = exp(seq(-1, -fixture_lookback, 
+                                     length.out = fixture_lookback))^0.25 /
+                      sum(exp(seq(-1, -fixture_lookback, 
+                                  length.out = fixture_lookback))^0.25)
+  )
+  # the player names
+  relevant_variables <- fixture_dataframe[,grepl("player.name", names(fixture_dataframe))] %>% names()
+  # other important variables
+  other_variables <- c("teams.home.name", "teams.away.name", "fixture.date", "fixture.id")
+  # for (i in 250:270){
+  fixture_dataframe <- fixture_dataframe[,c(relevant_variables, other_variables)]
+  
+  swap_column_names <- function(df) {
+    names(df) <- gsub("1", "temp", names(df))
+    names(df) <- gsub("2", "1", names(df))
+    names(df) <- gsub("temp", "2", names(df))
+    names(df) <- gsub("home", "temp", names(df))
+    names(df) <- gsub("away", "home", names(df))
+    names(df) <- gsub("temp", "away", names(df))
+    return(df)
+  }
+  for (i in 1:nrow(fixture_dataframe)){
+    remaining_fixtures <- fixture_dataframe[i:nrow(fixture_dataframe),]
+    current_fixture <- remaining_fixtures %>%
+      dplyr::slice(1)
+    home_team <- current_fixture["teams.home.name"]
+    away_team <- current_fixture["teams.away.name"]
+    home_prior_5 <- remaining_fixtures %>%
+      filter(teams.home.name == as.character(home_team) | 
+               teams.away.name == as.character(home_team)) %>%
+      dplyr::slice_head(n = fixture_lookback+1)
+    
+    away_prior_5 <- remaining_fixtures %>%
+      filter(teams.home.name == as.character(away_team) | 
+               teams.away.name == as.character(away_team)) %>%
+      dplyr::slice_head(n = fixture_lookback+1)
+    
+    # only select when current home team was playing in the past as:
+    # home and away team (swap the latter so calculations work later)
+    home_prior_as_away  <- home_prior_5 %>%
+      filter(teams.away.name == as.character(home_team)) %>% 
+      swap_column_names()
+    home_prior_as_home <- home_prior_5 %>%
+      filter(teams.home.name == as.character(home_team))
+    home_prior_5 <- bind_rows(home_prior_as_home, home_prior_as_away) %>% 
+      arrange(desc(fixture.date))
+    # same for current away team
+    away_prior_as_away  <- away_prior_5 %>%
+      filter(teams.away.name == as.character(away_team)) %>% 
+      swap_column_names()
+    away_prior_as_home <- away_prior_5 %>%
+      filter(teams.home.name == as.character(away_team))
+    away_prior_5 <- bind_rows(away_prior_as_home, away_prior_as_away) %>% 
+      arrange(desc(fixture.date))
+    
+    # function to obtain get the player list per game neatly
+    player_names_per_game <- function(prior_games, substring_category){
+      lists_names <- prior_games %>%
+        select(matches(substring_category)) %>%  # Select columns containing the substring selected
+        rowwise() %>%                  # Operate row-wise
+        mutate(unique_values = list(unique(c_across(everything())))) %>%  # Create a list of unique values
+        pull(unique_values)  
+      return(lists_names)
+    }
+    
+    # calculate the overall presence of players for a given list (overall, starting players, or substitutes) 
+    calculate_player_presence <- function(name_list, fixture_lookback){
+      # Flatten the list into a single vector while removing NA values
+      all_names <- unlist(name_list)
+      all_names <- all_names[!is.na(all_names)]
+      # Count occurrences of each name across all vectors, normalize for game amounts
+      name_counts_normalized <- table(all_names)/(fixture_lookback+1)
+      return(name_counts_normalized)
+    }
+    
+    obtain_overall_score <- function(prior_games, fixture_lookback){
+      # use the established smaller functions above to calculate presence of players over the time-span
+      lists_names <- player_names_per_game(prior_games, "team.1")
+      startXI_names <- player_names_per_game(prior_games, "startXI.team.1")
+      substitutes_names <- player_names_per_game(prior_games, "substitutes.team.1")
+      all_player_presence <- calculate_player_presence(lists_names, fixture_lookback+1)
+      startXI_presence <- calculate_player_presence(startXI_names, fixture_lookback+1)
+      substitutes_presence <- calculate_player_presence(substitutes_names, fixture_lookback+1)
+      # Calculate the similarity score
+      # In this case, we can calculate the sum of squared counts
+      similarity_score_all_players <- sum(all_player_presence^2)/length(all_player_presence)
+      similarity_score_startXI <- sum(startXI_presence^2)/length(startXI_presence)
+      similarity_score_substitutes <- sum(substitutes_presence^2)/length(substitutes_presence)
+      # place more weight for the overall similarity
+      overall_score <- (3*similarity_score_all_players + similarity_score_startXI + similarity_score_substitutes)/5
+      return(overall_score)
+    }
+    
+    overall_score_home <- if_else(nrow(home_prior_5) == (fixture_lookback+1),obtain_overall_score(home_prior_5, fixture_lookback),NA)
+    overall_score_away <- if_else(nrow(away_prior_5) == (fixture_lookback+1),obtain_overall_score(away_prior_5, fixture_lookback),NA)
+    
+    df_scores[[i]] <- c(overall_score_home, overall_score_away, current_fixture$fixture.id)
+    print(paste0("Calculated homogeneity scores for fixture ",i,"/",nrow(fixture_dataframe)))
+    
+  }
+  
+  
+  df_scores <- do.call(rbind, df_scores)
+  
+  rownames(df_scores) <- NULL
+  df_scores <- as.data.frame(lapply(as.data.frame(df_scores), function(x) sapply(x, unlist)))
+  colnames(df_scores) <- c("teams.home.homogeneity", "teams.away.homogeneity", "fixture.id")
+  
+  return(df_averages)
+}

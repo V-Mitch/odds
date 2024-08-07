@@ -65,6 +65,7 @@ fixtures_training <- fixtures_training %>%
     "cannot.draw",
     "can.draw"
   ))
+# Home advantage at a home team's stadium - fuzzy join for names
 fixtures_training <- fixtures_training %>%
   mutate(fixture.venue.city = sub(", .*", "", fixture.venue.city)) %>% 
   stringdist_left_join(world.cities, by = c("fixture.venue.city" = "name"), 
@@ -81,7 +82,7 @@ fixtures_training <- fixtures_training %>%
     if_else(stringdist::stringdist(country, teams.home.name, method = "jw") <= 0.15, 1, 0)))
 
 
-# Step 2: Join for home teams
+# Step 2: Join for home teams ranking
 home_join <- fixtures_training %>%
   left_join(fifa_rank, by = c("teams.home.name" = "country_full")) %>%
   filter(rank_date <= fixture.date) %>%
@@ -97,7 +98,7 @@ home_join <- fixtures_training %>%
   ) %>%
   ungroup()
 
-# Step 3: Join for away teams
+# Step 3: Join for away teams ranking
 away_join <- fixtures_training %>%
   left_join(fifa_rank, by = c("teams.away.name" = "country_full")) %>%
   filter(rank_date <= fixture.date) %>%
@@ -127,6 +128,8 @@ final_data <- final_data %>% arrange(desc(fixture.date))
 avg_df <- calculate_averages(final_data, post_game_varnames, 
                              fixture_lookback = 20,
                              weighting = "soft")
+
+# avg_players <- calcualte_averages()
 
 final_data <- calculate_time_diff(final_data)
 # namefile <- paste0(Sys.Date(), "__", "avg_df_10thjul")
