@@ -67,6 +67,7 @@ get_past_matches <- function(leagues, seasons, api_key, api_host, teams = c(), s
   
   for (i in 1:dim(tib_df)[1]){
     
+    
     url <- paste(infinitif,"/fixtures/statistics/?fixture=",tib_df[i,"fixture.id"], sep = "")
     res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
                                  'x-rapidapi-host' = api_host))
@@ -118,8 +119,6 @@ get_past_players <- function(leagues, seasons, api_key, api_host, teams = c(), s
   for (i in 1:nrow(tib_df)){
     # for (i in 1:10){
     
-    # browser()
-    
     url <- paste(infinitif,"/fixtures/lineups/?fixture=",tib_df[i,"fixture.id"], sep = "")
     res <- GET(url,  add_headers('x-rapidapi-key' = api_key,
                                  'x-rapidapi-host' = api_host))
@@ -142,20 +141,22 @@ get_past_players <- function(leagues, seasons, api_key, api_host, teams = c(), s
     } else{
       player_stats_df <- data.frame(matrix(ncol = 0, nrow = 1))
     }
-    
     # add the statistics of each player to the player lineups
     omit_names <- c("team.id", "team.name", "team.logo", "update", "id", "name", "photo")
     player_stats_names <- names(player_stats_df)[!names(player_stats_df) %in% omit_names]
     player_id_cols <- grep("player.id", names(lineup_df), value = TRUE)
-    for (j in 1:length(player_stats_names)){
-      name_of_metric <- player_stats_names[j]
-      for (k in 1:length(player_id_cols)){
-        name_of_column <- gsub("id", name_of_metric, player_id_cols[k])
-        temp_data <- player_stats_df[player_stats_df[,"id"] == as.numeric(lineup_df[,player_id_cols][k]) , ][name_of_metric]
-        lineup_df[name_of_column] <- temp_data
+    if (ncol(player_stats_df) == 0){
+      NULL
+    }else{
+      for (j in 1:length(player_stats_names)){
+        name_of_metric <- player_stats_names[j]
+        for (k in 1:length(player_id_cols)){
+          name_of_column <- gsub("id", name_of_metric, player_id_cols[k])
+          temp_data <- player_stats_df[player_stats_df[,"id"] == as.numeric(lineup_df[,player_id_cols][k]) , ][name_of_metric]
+          lineup_df[name_of_column] <- temp_data
+        }
       }
     }
-    
     final_fixture_row <- cbind(tib_df[i,], lineup_df)
     fixture_df <- bind_rows(final_fixture_row, fixture_df) %>% 
       suppressMessages()

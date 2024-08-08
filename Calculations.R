@@ -350,15 +350,15 @@ calculate_player_homogeneity <- function(fixture_dataframe,
     
     df_scores[[i]] <- c(overall_score_home, overall_score_away, current_fixture$fixture.id)
     print(paste0("Calculated homogeneity scores for fixture ",i,"/",nrow(fixture_dataframe)))
-    
+    browser()
   }
   
   
   df_scores <- do.call(rbind, df_scores)
-  
+  # browser()
   rownames(df_scores) <- NULL
   df_scores <- as.data.frame(lapply(as.data.frame(df_scores), function(x) sapply(x, unlist)))
   colnames(df_scores) <- c("teams.home.homogeneity", "teams.away.homogeneity", "fixture.id")
   
-  return(df_averages)
+  return(df_scores)
 }
