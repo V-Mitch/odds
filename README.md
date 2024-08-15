@@ -29,7 +29,7 @@ V. Model Deployment/Serving/Monnitoring/Maintenance
   out-of-scope  
     
 
-Current state: Code needs cleaning but functional.
+Current state: Code needs cleaning but functional - Cleaning, commenting, structuring necessary before passing to production 🕒 
   
 Outcome: Achieved **~60% accuracy and ~56% F1 score** on Win/Draw/Loss classification problem for the national men's football data.  
 Weakness: Predicting draws is very difficult, as explained in the literature. Currently looking for a work-around. One solution has been oversampling or the changing of case-weights in the classification problem.  
