@@ -129,6 +129,9 @@ avg_df <- calculate_averages(final_data, post_game_varnames,
                              fixture_lookback = 20,
                              weighting = "soft")
 
+avg_homogeneity <- calculate_player_homogeneity(final_data, 
+                                      fixture_lookback = 10)
+
 # avg_players <- calcualte_averages()
 
 final_data <- calculate_time_diff(final_data)
